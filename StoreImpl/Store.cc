@@ -42,6 +42,9 @@ operator<<(std::ostream& os, Status status)
         case Status::OPERATION_ERROR:
             os << "Status::OPERATION_ERROR";
             break;
+        case Status::CONDITION_NOT_MET:
+            os << "Status::CONDITION_NOT_MET";
+            break;
         case Status::UNKNOWN_ERROR:
             os << "Status::UNKNOWN_ERROR";
             break;
@@ -105,6 +108,23 @@ Store::loadSnapshot(Core::ProtoBuf::InputStream& stream)
 
 
 Result
+Store::checkCondition(const std::string& path,
+                      const std::string& contents) const
+{
+    Result result;
+
+    if (path == "[[keepalive-reserved-path]]") {
+        result.status = Status::CONDITION_NOT_MET;
+        result.error = format("keepalive reserved path: %s", path.c_str());
+        return result;
+    }
+
+    return result;
+}
+
+
+
+Result
 Store::write(const std::string& path, const std::string& contents)
 {
     Result result {};
@@ -115,6 +135,7 @@ Store::write(const std::string& path, const std::string& contents)
         result.error = format("Invalid param: %s,%s", path.c_str(), contents.c_str());
         return result;
     }
+
 
     leveldb::Status status = levelDB_->Put(leveldb::WriteOptions(), path, contents);
     if (!status.ok()) {

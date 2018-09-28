@@ -25,14 +25,14 @@ ENDIF(CMAKE_BUILD_TYPE MATCHES DEBUG)
 
 
 set (INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/
-                  ${PROJECT_SOURCE_DIR}/libraft/
+                  ${PROJECT_SOURCE_DIR}/libRaft/
 				  ${PROJECT_SOURCE_DIR}/../xtra_rhel6.x/include/
 )
 include_directories( ${INCLUDE_DIRS} )
     
-add_subdirectory( libraft )
+add_subdirectory( libRaft )
 add_subdirectory( StoreImpl )
-
+add_subdirectory( tzhttpd )
 
 link_directories( 
     ${PROJECT_SOURCE_DIR}/../xtra_rhel6.x/libs/

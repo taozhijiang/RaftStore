@@ -177,6 +177,8 @@ struct Result {
      * Default constructor. Sets status to OK and error to the empty string.
      */
     Result();
+
+    Result(Status s);
     /**
      * A code for whether an operation succeeded or why it did not. This is
      * meant to be used programmatically.

@@ -1,0 +1,3 @@
+[submodule "tzhttpd"]
+	path = tzhttpd
+	url = https://github.com/taozhijiang/tzhttpd.git

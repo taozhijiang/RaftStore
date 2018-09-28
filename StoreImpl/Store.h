@@ -54,16 +54,23 @@ enum class Status {
     INVALID_ARGUMENT = 1,
 
     /**
-     * If a file or directory that is required for the operation does not
-     * exist.
+     * May low level storage return error ( for example, read path
+     * now exists, etc).
      */
     OPERATION_ERROR = 2,
+
+    /**
+     * Precondition check, may read/write reserved path
+     * [[keepalive-reserved-path]]
+     *
+     */
+    CONDITION_NOT_MET = 3,
 
     /**
      * If a directory exists where a file is required or a file exists where
      * a directory is required.
      */
-    UNKNOWN_ERROR = 3,
+    UNKNOWN_ERROR = 4,
 
 };
 
@@ -116,6 +123,23 @@ class Store: public boost::noncopyable {
      *      This will blow away any existing files and directories.
      */
     void loadSnapshot(Core::ProtoBuf::InputStream& stream);
+
+    /**
+     * Verify that the file at path has the given contents.
+     * \param path
+     *      The path to the file that must have the contents specified in
+     *      'contents'.
+     * \param contents
+     *      The contents that the file specified by 'path' should have for an
+     *      OK response. An OK response is also returned if 'contents' is the
+     *      empty string and the file specified by 'path' does not exist.
+     * \return
+     *      Status and error message. Possible errors are:
+     *       - CONDITION_NOT_MET upon any error.
+     */
+    Result
+    checkCondition(const std::string& path,
+                   const std::string& contents = "") const;
 
     /**
      * Set the value of a file.

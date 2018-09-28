@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <string>
 
 #include "Core/Debug.h"
 #include "Core/Mutex.h"
@@ -85,7 +86,9 @@ StateMachine::StateMachine(std::shared_ptr<RaftConsensus> consensus,
     , isSnapshotRequested(false)
     , maySnapshotAt(TimePoint::min())
     , sessions()
-    , store(config.read<std::string>("levelDBPath"))
+    , store(config.read<std::string>("storagePath", "storage") + "/server" + 
+            std::to_string(static_cast<long long unsigned int>(config.read<uint64_t>("serverId"))) + 
+            "/leveldb")
     , versionHistory()
     , writer()
     , applyThread()

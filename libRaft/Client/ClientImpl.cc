@@ -331,7 +331,7 @@ ClientImpl::ExactlyOnceRPCHelper::keepAliveThreadMain()
             *trequest.mutable_exactly_once() = getRPCInfo(
                 Core::HoldingMutex(lockGuard),
                 TimePoint::max());
-            trequest.mutable_write()->set_path("keepalive");
+            trequest.mutable_write()->set_path("[[keepalive-reserved-path]]");
             trequest.mutable_write()->set_contents("you shouldn't see this!");
             Protocol::Client::StateMachineCommand::Response response;
             keepAliveCall = client->leaderRPC->makeCall();

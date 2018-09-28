@@ -3,8 +3,8 @@ CXX = g++
 CXXFLAGS = -g -O0 -std=c++0x
 SHELL = /bin/bash
 VERSION = 1.0
-EXTRAFLAGS =  -I../libraft/include
-EXTRAFLAGS += -L../../xtra_rhel6.x/libs/protobuf-2.5.0 ../build/libraft/libRaft.a ../build/StoreImpl/libStoreImpl.a -lprotoc -lprotobuf -lrt -lpthread
+EXTRAFLAGS =  -I../libRaft/include
+EXTRAFLAGS += -L../../xtra_rhel6.x/libs/protobuf-2.5.0 ../build/libRaft/libRaft.a ../build/StoreImpl/libStoreImpl.a -lprotoc -lprotobuf -lrt -lpthread
 
 #vpath %.cpp ./
 TARGET_DIR=./bin

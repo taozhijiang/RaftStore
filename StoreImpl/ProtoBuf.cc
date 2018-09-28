@@ -29,7 +29,11 @@ readOnlyStoreRPC(const Store& store,
                  PC::ReadOnlyStore::Response& response)
 {
     Result result;
-    if (request.has_read()) {
+
+    result = store.checkCondition(request.read().path());
+    if (result.status != Status::OK) {
+
+    } else if (request.has_read()) {
         std::string contents;
         result = store.read(request.read().path(), contents);
         response.mutable_read()->set_contents(contents);
@@ -48,15 +52,24 @@ readWriteStoreRPC(Store& store,
                   PC::ReadWriteStore::Response& response)
 {
     Result result;
+
     if (request.has_write()) {
+        result = store.checkCondition(request.write().path());
+        if (result.status != Status::OK)
+            goto ret;
         result = store.write(request.write().path(),
                              request.write().contents());
     } else if (request.has_remove()) {
+        result = store.checkCondition(request.remove().path());
+        if (result.status != Status::OK)
+            goto ret;
         result = store.remove(request.remove().path());
     } else {
         PANIC("Unexpected request: %s",
               Core::ProtoBuf::dumpString(request).c_str());
     }
+
+ret:
     response.set_status(static_cast<PC::Status>(result.status));
     if (result.status != Status::OK)
         response.set_error(result.error);

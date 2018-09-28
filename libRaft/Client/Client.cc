@@ -97,8 +97,16 @@ operator<<(std::ostream& os, Status status)
 
 Result::Result()
     : status(Status::OK)
-    , error()
+    , error("Status::OK")
 {
+}
+
+Result::Result(Status s)
+    : status(s)
+{
+    std::stringstream ss;
+    ss << s;
+    error = ss.str();
 }
 
 ////////// TreeDetails //////////

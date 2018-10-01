@@ -111,9 +111,22 @@ class ClientImpl {
                 TimePoint timeout,
                 std::string& contents);
 
+    Result range(const std::string& start_key,
+                 const std::string& end_key,
+                 uint64_t limit,
+                 TimePoint timeout,
+                 std::vector<std::string>& contents);
+
+    Result search(const std::string& search_key,
+                  uint64_t limit,
+                  TimePoint timeout,
+                  std::vector<std::string>& contents);
+
     /// See Tree::removeFile.
     Result remove(const std::string& path,
                   TimePoint timeout);
+
+
 
     /**
      * Low-level interface to ServerControl service used by

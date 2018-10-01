@@ -28,6 +28,11 @@ public:
     Result raft_get(const std::string& key, std::string& val);
     Result raft_remove(const std::string& key);
 
+    Result raft_range(const std::string& start_key, const std::string& end_key, uint64_t limit,
+                      std::vector<std::string>& range_store);
+    Result raft_search(const std::string& search_key, uint64_t limit,
+                       std::vector<std::string>& search_store);
+
 private:
     RaftStoreClient(){}
     ~RaftStoreClient() {}

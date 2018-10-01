@@ -184,13 +184,13 @@ Store::write(const std::string& path, const std::string& contents)
 }
 
 Result
-Store::read(const std::string& path, std::string& contents) const
+Store::read(const std::string& path, std::string& content) const
 {
     std::shared_ptr<const StoreDetails> storeDetails = getStoreDetails();
     return storeDetails->clientImpl->read(
         path,
         ClientImpl::absTimeout(storeDetails->timeoutNanos),
-        contents);
+        content);
 }
 
 Result
@@ -200,6 +200,28 @@ Store::remove(const std::string& path)
     return storeDetails->clientImpl->remove(
         path,
         ClientImpl::absTimeout(storeDetails->timeoutNanos));
+}
+
+Result
+Store::range(const std::string& start_key, const std::string& end_key,
+             uint64_t limit, std::vector<std::string>& contents)
+{
+    std::shared_ptr<const StoreDetails> storeDetails = getStoreDetails();
+    return storeDetails->clientImpl->range(
+        start_key, end_key, limit,
+        ClientImpl::absTimeout(storeDetails->timeoutNanos),
+        contents);
+}
+
+Result
+Store::search(const std::string& search_key,
+              uint64_t limit, std::vector<std::string>& contents)
+{
+    std::shared_ptr<const StoreDetails> storeDetails = getStoreDetails();
+    return storeDetails->clientImpl->search(
+        search_key, limit,
+        ClientImpl::absTimeout(storeDetails->timeoutNanos),
+        contents);
 }
 
 std::shared_ptr<const StoreDetails>

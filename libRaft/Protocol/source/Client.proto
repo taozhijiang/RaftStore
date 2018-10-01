@@ -262,6 +262,11 @@ enum Status {
     SESSION_EXPIRED = 6;
 };
 
+message KeyValue {
+    required string key   = 1;
+    required string value = 2;
+};
+
 /**
  * Read-only Tree state machine query: retrieves information from the
  * hierarchical key-value store.
@@ -271,16 +276,41 @@ message ReadOnlyStore {
         message Read {
             required string path = 1;
         }
-        optional Read read = 5;
-    }
-    message Response {
-        optional Status status = 1;
-        // The following are mutually exclusive.
-        optional string error = 2;
-        message Read {
-            required bytes contents = 1;
+        optional Read read = 1;
+
+        message Range {
+            optional string start_key = 1;
+            optional string end_key = 2;
+            optional uint64 limit = 3;
         }
-        optional Read read = 4;
+        optional Range range = 2;
+
+        message Search {
+            optional string search_key = 1;
+            optional uint64 limit = 2;
+        }
+        optional Search search = 3;
+    }
+
+    message Response {
+
+        optional Status status = 1;
+        optional string error = 2;
+
+        message Read {
+            required bytes content = 1;
+        }
+        optional Read read = 3;
+
+        message Range {
+            repeated string contents = 1;
+        }
+        optional Range range = 4;
+
+        message Search {
+            repeated string contents = 1;
+        }
+        optional Search search = 5;
     }
 }
 
@@ -294,15 +324,17 @@ message ReadWriteStore {
         required ExactlyOnceRPCInfo exactly_once = 10;
         message Write {
             required string path = 1;
-            required bytes contents = 2;
+            required bytes  content = 2;
         }
-        optional Write write = 4;
+        optional Write write = 1;
+
         message Remove {
             required string path = 1;
         }
-        optional Remove remove = 6;
+        optional Remove remove = 2;
 
     }
+
     message Response {
         optional Status status = 1;
         // The following are mutually exclusive.

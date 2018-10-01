@@ -129,6 +129,79 @@ int raft_remove_handler(const HttpParser& http_parser,
 }
 
 
+static
+int raft_range_handler(const HttpParser& http_parser,
+                       std::string& response, std::string& status_line,
+                       std::vector<std::string>& add_header) {
+
+    Result result;
+    std::vector<std::string> contents;
+    const UriParamContainer& params = http_parser.get_request_uri_params();
+
+    do {
+        std::string start_key = params.VALUE("START");
+        std::string end_key = params.VALUE("END");
+        auto limit_s = params.VALUE("LIMIT");
+        uint64_t limit = limit_s.empty() ? 0 : ::atoll(limit_s.c_str());
+        result = RaftStoreClient::Instance().raft_range(start_key, end_key, limit, contents);
+
+    } while (0);
+
+    Json::Value resultSets;
+    for (size_t i = 0; i< contents.size(); i++) {
+        resultSets.append(contents[i]);
+    }
+
+    Json::Value root;
+    root["CODE"]  = static_cast<int>(result.status);
+    root["INFO"]  = result.error;
+    root["VALUE"] = Json::FastWriter().write(resultSets);
+
+    response    = Json::FastWriter().write(root);
+    status_line = http_proto::generate_response_status_line(
+                        http_parser.get_version(), StatusCode::success_ok);
+    add_header  = { "Cache-Control: no-cache", "Content-type: application/json; charset=utf-8;"};
+
+    return 0;
+}
+
+static
+int raft_search_handler(const HttpParser& http_parser,
+                       std::string& response, std::string& status_line,
+                       std::vector<std::string>& add_header) {
+
+    Result result;
+    std::vector<std::string> contents;
+    const UriParamContainer& params = http_parser.get_request_uri_params();
+
+    do {
+
+        std::string search_key = params.VALUE("SEARCH");
+        auto limit_s = params.VALUE("LIMIT");
+        uint64_t limit = limit_s.empty() ? 0 : ::atoll(limit_s.c_str());
+        result = RaftStoreClient::Instance().raft_search(search_key, limit, contents);
+
+    } while (0);
+
+    Json::Value resultSets;
+    for (size_t i = 0; i< contents.size(); i++) {
+        resultSets.append(contents[i]);
+    }
+
+    Json::Value root;
+    root["CODE"] = static_cast<int>(result.status);
+    root["INFO"]  = result.error;
+    root["VALUE"] = Json::FastWriter().write(resultSets);
+
+    response    = Json::FastWriter().write(root);
+    status_line = http_proto::generate_response_status_line(
+                        http_parser.get_version(), StatusCode::success_ok);
+    add_header  = { "Cache-Control: no-cache", "Content-type: application/json; charset=utf-8;"};
+
+    return 0;
+}
+
+
 
 // http post
 
@@ -331,6 +404,10 @@ bool raft_store_v1_http_init(std::shared_ptr<tzhttpd::HttpServer>& http_ptr) {
         "^/raftstore/api/v1/set$", tzhttpd::raft_set_handler, true);
     http_ptr->register_http_get_handler(
         "^/raftstore/api/v1/remove$", tzhttpd::raft_remove_handler, true);
+    http_ptr->register_http_get_handler(
+        "^/raftstore/api/v1/range$", tzhttpd::raft_range_handler, true);
+    http_ptr->register_http_get_handler(
+        "^/raftstore/api/v1/search$", tzhttpd::raft_search_handler, true);
 
     http_ptr->register_http_post_handler(
         "^/raftstore/api/v1/get$", tzhttpd::raftpost_get_handler, true);

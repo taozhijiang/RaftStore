@@ -332,7 +332,7 @@ ClientImpl::ExactlyOnceRPCHelper::keepAliveThreadMain()
                 Core::HoldingMutex(lockGuard),
                 TimePoint::max());
             trequest.mutable_write()->set_path("[[keepalive-reserved-path]]");
-            trequest.mutable_write()->set_contents("you shouldn't see this!");
+            trequest.mutable_write()->set_content("you shouldn't see this!");
             Protocol::Client::StateMachineCommand::Response response;
             keepAliveCall = client->leaderRPC->makeCall();
             keepAliveCall->start(OpCode::STATE_MACHINE_COMMAND, request,
@@ -567,12 +567,11 @@ ClientImpl::write(const std::string& path,
                   const std::string& contents,
                   TimePoint timeout)
 {
-    std::string realPath = path;
     Protocol::Client::ReadWriteStore::Request request;
     *request.mutable_exactly_once() =
         exactlyOnceRPCHelper.getRPCInfo(timeout);
-    request.mutable_write()->set_path(realPath);
-    request.mutable_write()->set_contents(contents);
+    request.mutable_write()->set_path(path);
+    request.mutable_write()->set_content(contents);
     Protocol::Client::ReadWriteStore::Response response;
     storeCall(*leaderRPC,
               request, response, timeout);
@@ -588,17 +587,65 @@ ClientImpl::read(const std::string& path,
                  std::string& contents)
 {
     contents = "";
-    std::string realPath = path;
     Protocol::Client::ReadOnlyStore::Request request;
-    request.mutable_read()->set_path(realPath);
+    request.mutable_read()->set_path(path);
     Protocol::Client::ReadOnlyStore::Response response;
     storeCall(*leaderRPC,
               request, response, timeout);
     if (response.status() != Protocol::Client::Status::OK)
         return storeError(response);
-    contents = response.read().contents();
+    contents = response.read().content();
     return Result();
 }
+
+Result
+ClientImpl::range(const std::string& start_key,
+                  const std::string& end_key,
+                  uint64_t limit,
+                  TimePoint timeout,
+                  std::vector<std::string>& contents) {
+
+    contents.clear();
+    Protocol::Client::ReadOnlyStore::Request request;
+    request.mutable_range()->set_start_key(start_key);
+    request.mutable_range()->set_end_key(end_key);
+    request.mutable_range()->set_limit(limit);
+    Protocol::Client::ReadOnlyStore::Response response;
+    storeCall(*leaderRPC,
+              request, response, timeout);
+    if (response.status() != Protocol::Client::Status::OK)
+        return storeError(response);
+
+    contents.reserve(response.range().contents_size());
+    for (int i = 0; i < response.range().contents_size(); ++i) {
+        contents.push_back(response.range().contents(i));
+    }
+    return Result();
+}
+
+Result
+ClientImpl::search(const std::string& search_key,
+                  uint64_t limit,
+                  TimePoint timeout,
+                  std::vector<std::string>& contents) {
+
+    contents.clear();
+    Protocol::Client::ReadOnlyStore::Request request;
+    request.mutable_search()->set_search_key(search_key);
+    request.mutable_search()->set_limit(limit);
+    Protocol::Client::ReadOnlyStore::Response response;
+    storeCall(*leaderRPC,
+              request, response, timeout);
+    if (response.status() != Protocol::Client::Status::OK)
+        return storeError(response);
+
+    contents.reserve(response.search().contents_size());
+    for (int i = 0; i < response.search().contents_size(); ++i) {
+        contents.push_back(response.search().contents(i));
+    }
+    return Result();
+}
+
 
 Result
 ClientImpl::remove(const std::string& path,

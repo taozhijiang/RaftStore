@@ -16,6 +16,8 @@
 
 #include <cassert>
 
+#include <leveldb/comparator.h>
+
 #include "Protocol/gen-cpp/ServerStats.pb.h"
 #include "Protocol/gen-cpp/Snapshot.pb.h"
 #include "Core/Debug.h"
@@ -194,6 +196,81 @@ Store::remove(const std::string& path)
     ++numRemoveSuccess;
     return result;
 }
+
+
+
+Result
+Store::range(const std::string& start, const std::string& end, uint64_t limit,
+             std::vector<std::string>& range_store) const {
+
+    ++numReadAttempted;
+    Result result {};
+
+    std::unique_ptr<leveldb::Iterator> it(levelDB_->NewIterator(leveldb::ReadOptions()));
+    uint64_t cnt = 0;
+    leveldb::Options options;
+
+    if (start.empty()) {
+        it->SeekToFirst();
+    } else {
+        it->Seek(start);
+    }
+
+    for ( /* */; it->Valid(); it->Next()) {
+
+        leveldb::Slice key = it->key();
+        std::string key_str = key.ToString();
+
+        // leveldb::Slice value = it->value();
+        // std::string val_str = value.ToString();
+
+        if (limit && ++cnt > limit) {
+            break;
+        }
+
+        range_store.push_back(key_str);
+
+        if (!end.empty() && options.comparator->Compare(key, end) > 0) {
+            break;
+        }
+    }
+
+    ++numReadSuccess;
+    return result;
+}
+
+Result
+Store::search(const std::string& search_key, uint64_t limit,
+              std::vector<std::string>& search_store) const {
+
+    ++numReadAttempted;
+    Result result {};
+
+    std::unique_ptr<leveldb::Iterator> it(levelDB_->NewIterator(leveldb::ReadOptions()));
+    uint64_t cnt = 0;
+    leveldb::Options options;
+
+    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+
+        leveldb::Slice key = it->key();
+        std::string key_str = key.ToString();
+
+        // leveldb::Slice value = it->value();
+        // std::string val_str = value.ToString();
+
+        if (key_str.find(search_key) != std::string::npos) {
+            search_store.push_back(key_str);
+        }
+
+        if (limit && ++cnt > limit) {
+            break;
+        }
+    }
+
+    ++numReadSuccess;
+    return result;
+}
+
 
 void
 Store::updateServerStats(Protocol::ServerStats::Store& tstats) const

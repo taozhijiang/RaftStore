@@ -189,6 +189,14 @@ class Store: public boost::noncopyable {
     Result
     remove(const std::string& path);
 
+    Result
+    range(const std::string& start, const std::string& end, uint64_t limit,
+          std::vector<std::string>& range_store) const;
+
+    Result
+    search(const std::string& search_key, uint64_t limit,
+           std::vector<std::string>& search_store) const;
+
     /**
      * Add metrics about the tree to the given structure.
      */

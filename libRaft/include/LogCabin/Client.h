@@ -290,6 +290,14 @@ class Store {
     Result
     remove(const std::string& path);
 
+    Result
+    range(const std::string& start_key, const std::string& end_key,
+          uint64_t limit, std::vector<std::string>& contents);
+
+    Result
+    search(const std::string& search_key,
+           uint64_t limit, std::vector<std::string>& contents);
+
   private:
     /**
      * Get a reference to the implementation-specific members of this class.

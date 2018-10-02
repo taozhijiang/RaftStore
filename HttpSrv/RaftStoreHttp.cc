@@ -13,6 +13,42 @@ using namespace http_proto;
 
 //simple http get method
 
+
+static
+int raft_stat_handler(const HttpParser& http_parser,
+                      std::string& response, std::string& status_line,
+                      std::vector<std::string>& add_header) {
+
+    Result result;
+    std::string content;
+    const UriParamContainer& params = http_parser.get_request_uri_params();
+
+    do {
+
+        std::string client = params.VALUE("CLIENT");
+        std::string stat;
+        result = RaftStoreClient::Instance().raft_stat(client, stat);
+        if (result.status == Status::OK) {
+            content = std::move(stat);
+        }
+
+    } while (0);
+
+    Json::Value root;
+    root["CODE"] = static_cast<int>(result.status);
+    root["INFO"] = result.error;
+    if (result.status == Status::OK) {
+        root["VALUE"] = std::move(content);
+    }
+
+    response    = Json::FastWriter().write(root);
+    status_line = http_proto::generate_response_status_line(
+                        http_parser.get_version(), StatusCode::success_ok);
+    add_header  = { "Cache-Control: no-cache", "Content-type: application/json; charset=utf-8;"};
+
+    return 0;
+}
+
 static
 int raft_get_handler(const HttpParser& http_parser,
                      std::string& response, std::string& status_line,
@@ -23,14 +59,6 @@ int raft_get_handler(const HttpParser& http_parser,
     const UriParamContainer& params = http_parser.get_request_uri_params();
 
     do {
-
-        if (params.VALUE("AUTH") != "d44bfc666db304b2f72b4918c8b46f78") {
-            tzhttpd_log_err("AUTH check failed!");
-            response    = http_proto::content_forbidden;
-            status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_forbidden);
-            return 0;
-        }
 
         std::string key  = params.VALUE("KEY");
         std::string val;
@@ -66,14 +94,6 @@ int raft_set_handler(const HttpParser& http_parser,
 
     do {
 
-        if (params.VALUE("AUTH") != "d44bfc666db304b2f72b4918c8b46f78") {
-            tzhttpd_log_err("AUTH check failed!");
-            response = http_proto::content_forbidden;
-            status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_forbidden);
-            return 0;
-        }
-
         std::string key = params.VALUE("KEY");
         std::string val = params.VALUE("VALUE");
         result = RaftStoreClient::Instance().raft_set(key, val);
@@ -103,14 +123,6 @@ int raft_remove_handler(const HttpParser& http_parser,
 
     do {
 
-        if (params.VALUE("AUTH") != "d44bfc666db304b2f72b4918c8b46f78") {
-            tzhttpd_log_err("AUTH check failed!");
-            response = http_proto::content_forbidden;
-            status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_forbidden);
-            return 0;
-        }
-
         std::string key = params.VALUE("KEY");
         result = RaftStoreClient::Instance().raft_remove(key);
 
@@ -139,6 +151,7 @@ int raft_range_handler(const HttpParser& http_parser,
     const UriParamContainer& params = http_parser.get_request_uri_params();
 
     do {
+
         std::string start_key = params.VALUE("START");
         std::string end_key = params.VALUE("END");
         auto limit_s = params.VALUE("LIMIT");
@@ -225,14 +238,6 @@ int raftpost_get_handler(const HttpParser& http_parser, const std::string& post_
 
         std::string TYPE = root["TYPE"].asString();
         std::string KEY  = root["KEY"].asString();
-        std::string AUTH = root["AUTH"].asString();
-        if (AUTH != "d44bfc666db304b2f72b4918c8b46f78") {
-            tzhttpd_log_err("AUTH check failed!");
-            response = http_proto::content_forbidden;
-            status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_forbidden);
-            return 0;
-        }
 
         if (KEY.empty() || (!TYPE.empty() && TYPE != "base64")) {
             tzhttpd_log_err("param error for: %s", post_data.c_str());
@@ -293,14 +298,6 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
         std::string TYPE = root["TYPE"].asString();
         std::string KEY  = root["KEY"].asString();
         std::string VALUE= root["VALUE"].asString();
-        std::string AUTH = root["AUTH"].asString();
-        if (AUTH != "d44bfc666db304b2f72b4918c8b46f78") {
-            tzhttpd_log_err("AUTH check failed!");
-            response = http_proto::content_forbidden;
-            status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_forbidden);
-            return 0;
-        }
 
         if (KEY.empty() || VALUE.empty() || (!TYPE.empty() && TYPE != "base64")) {
             tzhttpd_log_err("param error for: %s", post_data.c_str());
@@ -355,14 +352,6 @@ int raftpost_remove_handler(const HttpParser& http_parser, const std::string& po
 
         std::string TYPE = root["TYPE"].asString();
         std::string KEY  = root["KEY"].asString();
-        std::string AUTH = root["AUTH"].asString();
-        if (AUTH != "d44bfc666db304b2f72b4918c8b46f78") {
-            tzhttpd_log_err("AUTH check failed!");
-            response = http_proto::content_forbidden;
-            status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_forbidden);
-            return 0;
-        }
 
         if (KEY.empty() || (!TYPE.empty() && TYPE != "base64")) {
             tzhttpd_log_err("param error for: %s", post_data.c_str());
@@ -398,14 +387,23 @@ int raftpost_remove_handler(const HttpParser& http_parser, const std::string& po
 
 bool raft_store_v1_http_init(std::shared_ptr<tzhttpd::HttpServer>& http_ptr) {
 
+    //
+    http_ptr->register_http_get_handler(
+        "^/raftstore/api/v1/stat$", tzhttpd::raft_stat_handler, true);
+
+    // KEY
     http_ptr->register_http_get_handler(
         "^/raftstore/api/v1/get$", tzhttpd::raft_get_handler, true);
+    // KEY, VALUE
     http_ptr->register_http_get_handler(
         "^/raftstore/api/v1/set$", tzhttpd::raft_set_handler, true);
+    // KEY
     http_ptr->register_http_get_handler(
         "^/raftstore/api/v1/remove$", tzhttpd::raft_remove_handler, true);
+    // START, END, LIMIT
     http_ptr->register_http_get_handler(
         "^/raftstore/api/v1/range$", tzhttpd::raft_range_handler, true);
+    // SEARCH, LIMIT
     http_ptr->register_http_get_handler(
         "^/raftstore/api/v1/search$", tzhttpd::raft_search_handler, true);
 

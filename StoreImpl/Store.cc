@@ -96,7 +96,29 @@ bool Store::init() {
 void
 Store::dumpSnapshot(Core::ProtoBuf::OutputStream& stream) const
 {
-    //
+    Snapshot::SnapshotItem total;
+    Snapshot::KeyValue* ptr;
+
+    std::unique_ptr<leveldb::Iterator> it(levelDB_->NewIterator(leveldb::ReadOptions()));
+    uint64_t cnt = 0;
+
+    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+
+        leveldb::Slice key = it->key();
+        std::string key_str = key.ToString();
+
+        leveldb::Slice value = it->value();
+        std::string val_str = value.ToString();
+
+        ptr = total.add_kv();
+        ptr->set_key(key_str);
+        ptr->set_value(val_str);
+
+        ++ cnt;
+
+    }
+    stream.writeMessage(total);
+    NOTICE("snapshot totally store %lu items.", cnt);
 }
 
 /**
@@ -105,7 +127,36 @@ Store::dumpSnapshot(Core::ProtoBuf::OutputStream& stream) const
 void
 Store::loadSnapshot(Core::ProtoBuf::InputStream& stream)
 {
-    //
+
+    // destroy levelDB first
+    leveldb::DestroyDB(levelDBPath_, leveldb::Options());
+
+    leveldb::Options create_options;
+    create_options.error_if_exists = true;
+    leveldb::DB* db;
+    leveldb::Status status = leveldb::DB::Open(create_options, levelDBPath_, &db);
+
+    if (!status.ok()) {
+        ERROR("Reset levelDB error: %s", levelDBPath_.c_str());
+        return;
+    }
+    levelDB_.reset(db);
+
+    // load data
+    Snapshot::SnapshotItem total;
+    stream.readMessage(total);
+
+    leveldb::WriteOptions write_options;
+    int size = total.kv_size();
+    for (int i = 0; i < size; ++ i) {
+        Snapshot::KeyValue kv = total.kv(i);
+        leveldb::Status status = levelDB_->Put(write_options, kv.key(), kv.value());
+        if (!status.ok()) {
+            ERROR("Restoring %s:%s failed, give up...",
+                            kv.key().c_str(), kv.value().c_str());
+            return;
+        }
+    }
 }
 
 
@@ -139,7 +190,9 @@ Store::write(const std::string& path, const std::string& contents)
     }
 
 
-    leveldb::Status status = levelDB_->Put(leveldb::WriteOptions(), path, contents);
+    leveldb::WriteOptions options;
+    options.sync = true;
+    leveldb::Status status = levelDB_->Put(options, path, contents);
     if (!status.ok()) {
         result.status = Status::OPERATION_ERROR;
         result.error = format("Operation failed: %s,%s", path.c_str(), contents.c_str());
@@ -186,7 +239,9 @@ Store::remove(const std::string& path)
         return result;
     }
 
-    leveldb::Status status = levelDB_->Delete(leveldb::WriteOptions(), path);
+    leveldb::WriteOptions options;
+    options.sync = true;
+    leveldb::Status status = levelDB_->Delete(options, path);
     if (!status.ok()) {
         result.status = Status::OPERATION_ERROR;
         result.error = format("Operation failed: %s", path.c_str());
@@ -268,6 +323,15 @@ Store::search(const std::string& search_key, uint64_t limit,
     }
 
     ++numReadSuccess;
+    return result;
+}
+
+Result
+Store::stat(const std::string& client, std::string& content) const {
+
+    Result result {};
+
+    content = "Stat response TODO";
     return result;
 }
 

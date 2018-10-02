@@ -194,6 +194,16 @@ Store::read(const std::string& path, std::string& content) const
 }
 
 Result
+Store::stat(const std::string& client, std::string& content) const
+{
+    std::shared_ptr<const StoreDetails> storeDetails = getStoreDetails();
+    return storeDetails->clientImpl->stat(
+        client,
+        ClientImpl::absTimeout(storeDetails->timeoutNanos),
+        content);
+}
+
+Result
 Store::remove(const std::string& path)
 {
     std::shared_ptr<const StoreDetails> storeDetails = getStoreDetails();

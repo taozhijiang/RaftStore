@@ -12,22 +12,18 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-package LogCabin.Tree.Snapshot;
+package LogCabin.Store.Snapshot;
+
+
+message KeyValue {
+    required bytes key   = 1;
+    required bytes value = 2;
+};
+
 
 /**
- * Snapshot format for a Tree::Directory.
+ * Snapshot format
  */
-message Directory {
-    /// The names of child directories.
-    repeated string directories = 1;
-    /// The names of child files.
-    repeated string files = 2;
-}
-
-/**
- * Snapshot format for a Tree::File.
- */
-message File {
-    /// The contents of the file.
-    required bytes contents = 1;
+message SnapshotItem {
+    repeated KeyValue kv = 1;
 }

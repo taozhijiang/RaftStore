@@ -262,10 +262,6 @@ enum Status {
     SESSION_EXPIRED = 6;
 };
 
-message KeyValue {
-    required string key   = 1;
-    required string value = 2;
-};
 
 /**
  * Read-only Tree state machine query: retrieves information from the
@@ -273,23 +269,29 @@ message KeyValue {
  */
 message ReadOnlyStore {
     message Request {
-        message Read {
-            required string path = 1;
+
+        message Stat {
+            optional bytes client = 1;
         }
-        optional Read read = 1;
+        optional Stat stat = 1;
+
+        message Read {
+            required bytes path = 1;
+        }
+        optional Read read = 10;
 
         message Range {
-            optional string start_key = 1;
-            optional string end_key = 2;
+            optional bytes start_key = 1;
+            optional bytes end_key = 2;
             optional uint64 limit = 3;
         }
-        optional Range range = 2;
+        optional Range range = 11;
 
         message Search {
-            optional string search_key = 1;
+            optional bytes search_key = 1;
             optional uint64 limit = 2;
         }
-        optional Search search = 3;
+        optional Search search = 12;
     }
 
     message Response {
@@ -297,20 +299,25 @@ message ReadOnlyStore {
         optional Status status = 1;
         optional string error = 2;
 
+        message Stat {
+            optional bytes content = 1;
+        }
+        optional Stat stat = 3;
+
         message Read {
             required bytes content = 1;
         }
-        optional Read read = 3;
+        optional Read read = 10;
 
         message Range {
-            repeated string contents = 1;
+            repeated bytes contents = 1;
         }
-        optional Range range = 4;
+        optional Range range = 11;
 
         message Search {
-            repeated string contents = 1;
+            repeated bytes contents = 1;
         }
-        optional Search search = 5;
+        optional Search search = 12;
     }
 }
 

@@ -21,6 +21,25 @@ bool RaftStoreClient::init(const std::string& raftBackends) {
     return cluster_ ? true : false;
 }
 
+Result RaftStoreClient::raft_stat(const std::string& client, std::string& stat) {
+
+    if (!cluster_) {
+        tzhttpd::tzhttpd_log_err("param error");
+        return Status::INVALID_ARGUMENT;
+    }
+
+    auto store = cluster_->getStore();
+    auto result = store.stat(client, stat);
+    if(result.status != Status::OK) {
+        tzhttpd::tzhttpd_log_err("stat(%s) error with: %d(%s)",
+                                 client.c_str(),
+                                 result.status, result.error.c_str());
+        return result;
+    }
+
+    tzhttpd::tzhttpd_log_debug("stat(%s) ok!", client.c_str());
+    return result;
+}
 
 
 Result RaftStoreClient::raft_set(const std::string& key, const std::string& val) {

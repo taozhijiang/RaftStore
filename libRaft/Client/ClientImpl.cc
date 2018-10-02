@@ -564,14 +564,14 @@ ClientImpl::getServerInfo(const std::string& host,
 
 Result
 ClientImpl::write(const std::string& path,
-                  const std::string& contents,
+                  const std::string& content,
                   TimePoint timeout)
 {
     Protocol::Client::ReadWriteStore::Request request;
     *request.mutable_exactly_once() =
         exactlyOnceRPCHelper.getRPCInfo(timeout);
     request.mutable_write()->set_path(path);
-    request.mutable_write()->set_content(contents);
+    request.mutable_write()->set_content(content);
     Protocol::Client::ReadWriteStore::Response response;
     storeCall(*leaderRPC,
               request, response, timeout);
@@ -584,9 +584,9 @@ ClientImpl::write(const std::string& path,
 Result
 ClientImpl::read(const std::string& path,
                  TimePoint timeout,
-                 std::string& contents)
+                 std::string& content)
 {
-    contents = "";
+    content.clear();
     Protocol::Client::ReadOnlyStore::Request request;
     request.mutable_read()->set_path(path);
     Protocol::Client::ReadOnlyStore::Response response;
@@ -594,7 +594,24 @@ ClientImpl::read(const std::string& path,
               request, response, timeout);
     if (response.status() != Protocol::Client::Status::OK)
         return storeError(response);
-    contents = response.read().content();
+    content = response.read().content();
+    return Result();
+}
+
+Result
+ClientImpl::stat(const std::string& client,
+                 TimePoint timeout,
+                 std::string& content)
+{
+    content.clear();
+    Protocol::Client::ReadOnlyStore::Request request;
+    request.mutable_stat()->set_client(client);
+    Protocol::Client::ReadOnlyStore::Response response;
+    storeCall(*leaderRPC,
+              request, response, timeout);
+    if (response.status() != Protocol::Client::Status::OK)
+        return storeError(response);
+    content = response.stat().content();
     return Result();
 }
 

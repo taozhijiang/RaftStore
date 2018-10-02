@@ -197,6 +197,9 @@ class Store: public boost::noncopyable {
     search(const std::string& search_key, uint64_t limit,
            std::vector<std::string>& search_store) const;
 
+    Result
+    stat(const std::string& client, std::string& content) const;
+
     /**
      * Add metrics about the tree to the given structure.
      */

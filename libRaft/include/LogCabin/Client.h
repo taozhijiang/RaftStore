@@ -291,6 +291,9 @@ class Store {
     remove(const std::string& path);
 
     Result
+    stat(const std::string& client, std::string& contents) const;
+
+    Result
     range(const std::string& start_key, const std::string& end_key,
           uint64_t limit, std::vector<std::string>& contents);
 

@@ -24,6 +24,8 @@ public:
     static RaftStoreClient& Instance();
     bool init(const std::string& raftBackends);
 
+    Result raft_stat(const std::string& client, std::string& stat);
+
     Result raft_set(const std::string& key, const std::string& val);
     Result raft_get(const std::string& key, std::string& val);
     Result raft_remove(const std::string& key);

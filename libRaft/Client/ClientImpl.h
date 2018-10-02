@@ -101,15 +101,17 @@ class ClientImpl {
                         const std::string& workingDirectory,
                         std::string& canonical);
 
-    /// See Tree::write.
     Result write(const std::string& path,
-                 const std::string& contents,
+                 const std::string& content,
                  TimePoint timeout);
 
-    /// See Tree::read.
+    Result stat(const std::string& client,
+                TimePoint timeout,
+                std::string& content);
+
     Result read(const std::string& path,
                 TimePoint timeout,
-                std::string& contents);
+                std::string& content);
 
     Result range(const std::string& start_key,
                  const std::string& end_key,

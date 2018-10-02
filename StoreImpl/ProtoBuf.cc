@@ -33,6 +33,12 @@ readOnlyStoreRPC(const Store& store,
     result = store.checkCondition(request.read().path());
     if (result.status != Status::OK) {
 
+    } else if (request.has_stat()) {
+
+        std::string content;
+        result = store.stat(request.stat().client(), content);
+        response.mutable_stat()->set_content(content);
+
     } else if (request.has_read()) {
 
         std::string content;

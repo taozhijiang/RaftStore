@@ -282,11 +282,11 @@ Store::range(const std::string& start, const std::string& end, uint64_t limit,
             break;
         }
 
-        range_store.push_back(key_str);
-
         if (!end.empty() && options.comparator->Compare(key, end) > 0) {
             break;
         }
+
+        range_store.push_back(key_str);
     }
 
     ++numReadSuccess;

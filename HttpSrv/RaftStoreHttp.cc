@@ -236,7 +236,9 @@ int raft_range_handler(const HttpParser& http_parser,
         std::string end_key = params.VALUE("END");
         auto limit_s = params.VALUE("LIMIT");
         uint64_t limit = limit_s.empty() ? 0 : ::atoll(limit_s.c_str());
-        result = RaftStoreClient::Instance().raft_range(dbname + "_" + start_key, dbname + "_" + end_key, limit, contents);
+        result = RaftStoreClient::Instance().raft_range(dbname + "_" + start_key,
+                                                        end_key.empty() ? dbname + "~" : dbname + "_" + end_key,
+                                                        limit, contents);
 
     } while (0);
 
@@ -248,7 +250,9 @@ int raft_range_handler(const HttpParser& http_parser,
     Json::Value root;
     root["CODE"]  = static_cast<int>(result.status);
     root["INFO"]  = result.error;
-    root["VALUE"] = Json::FastWriter().write(resultSets);
+    if (!resultSets.empty()) {
+        root["VALUE"] = Json::FastWriter().write(resultSets);
+    }
 
     response    = Json::FastWriter().write(root);
     status_line = http_proto::generate_response_status_line(
@@ -305,7 +309,9 @@ ret:
     Json::Value root;
     root["CODE"] = static_cast<int>(result.status);
     root["INFO"]  = result.error;
-    root["VALUE"] = Json::FastWriter().write(resultSets);
+    if (!resultSets.empty()) {
+        root["VALUE"] = Json::FastWriter().write(resultSets);
+    }
 
     response    = Json::FastWriter().write(root);
     status_line = http_proto::generate_response_status_line(

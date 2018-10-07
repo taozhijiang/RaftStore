@@ -84,6 +84,7 @@ bool Store::init() {
     leveldb::Status status = leveldb::DB::Open(options, levelDBPath_, &db);
 
     if (!status.ok()) {
+        PANIC("Open levelDB %s failed.", levelDBPath_.c_str());
         return false;
     }
 
@@ -118,17 +119,15 @@ Store::dumpSnapshot(Core::ProtoBuf::OutputStream& stream) const
 
     }
     stream.writeMessage(total);
-    NOTICE("snapshot totally store %lu items.", cnt);
+    NOTICE("dumpSnapshot finished, snapshot totally store %lu items.", cnt);
 }
 
-/**
- * Load the tree from the given stream.
- */
+
 void
 Store::loadSnapshot(Core::ProtoBuf::InputStream& stream)
 {
 
-    // destroy levelDB first
+    // destroy levelDB completely first
     leveldb::DestroyDB(levelDBPath_, leveldb::Options());
 
     leveldb::Options create_options;
@@ -161,14 +160,14 @@ Store::loadSnapshot(Core::ProtoBuf::InputStream& stream)
 
 
 Result
-Store::checkCondition(const std::string& path,
-                      const std::string& contents) const
+Store::checkCondition(const std::string& key,
+                      const std::string& content) const
 {
     Result result;
 
-    if (path == "[[keepalive-reserved-path]]") {
+    if (key == "[[keepalive-reserved-path]]") {
         result.status = Status::CONDITION_NOT_MET;
-        result.error = format("keepalive reserved path: %s", path.c_str());
+        result.error = format("keepalive reserved path: %s", key.c_str());
         return result;
     }
 
@@ -178,24 +177,24 @@ Store::checkCondition(const std::string& path,
 
 
 Result
-Store::write(const std::string& path, const std::string& contents)
+Store::write(const std::string& key, const std::string& content)
 {
     Result result {};
     ++numWriteAttempted;
 
-    if (path.empty() || contents.empty()) {
+    if (key.empty() || content.empty()) {
         result.status = Status::INVALID_ARGUMENT;
-        result.error = format("Invalid param: %s,%s", path.c_str(), contents.c_str());
+        result.error = format("Invalid param: %s,%s", key.c_str(), content.c_str());
         return result;
     }
 
 
     leveldb::WriteOptions options;
     options.sync = true;
-    leveldb::Status status = levelDB_->Put(options, path, contents);
+    leveldb::Status status = levelDB_->Put(options, key, content);
     if (!status.ok()) {
         result.status = Status::OPERATION_ERROR;
-        result.error = format("Operation failed: %s,%s", path.c_str(), contents.c_str());
+        result.error = format("Operation failed: %s,%s", key.c_str(), content.c_str());
         return result;
     }
 
@@ -204,22 +203,22 @@ Store::write(const std::string& path, const std::string& contents)
 }
 
 Result
-Store::read(const std::string& path, std::string& contents) const
+Store::read(const std::string& key, std::string& content) const
 {
     ++numReadAttempted;
-    contents.clear();
+    content.clear();
     Result result {};
 
-    if (path.empty()) {
+    if (key.empty()) {
         result.status = Status::INVALID_ARGUMENT;
-        result.error = format("Invalid param: %s", path.c_str());
+        result.error = format("Invalid param: %s", key.c_str());
         return result;
     }
 
-    leveldb::Status status = levelDB_->Get(leveldb::ReadOptions(), path, &contents);
+    leveldb::Status status = levelDB_->Get(leveldb::ReadOptions(), key, &content);
     if (!status.ok()) {
         result.status = Status::OPERATION_ERROR;
-        result.error = format("Operation failed: %s", path.c_str());
+        result.error = format("Operation failed: %s", key.c_str());
         return result;
     }
 
@@ -228,23 +227,23 @@ Store::read(const std::string& path, std::string& contents) const
 }
 
 Result
-Store::remove(const std::string& path)
+Store::remove(const std::string& key)
 {
     ++numRemoveAttempted;
     Result result {};
 
-    if (path.empty()) {
+    if (key.empty()) {
         result.status = Status::INVALID_ARGUMENT;
-        result.error = format("Invalid param: %s", path.c_str());
+        result.error = format("Invalid param: %s", key.c_str());
         return result;
     }
 
     leveldb::WriteOptions options;
     options.sync = true;
-    leveldb::Status status = levelDB_->Delete(options, path);
+    leveldb::Status status = levelDB_->Delete(options, key);
     if (!status.ok()) {
         result.status = Status::OPERATION_ERROR;
-        result.error = format("Operation failed: %s", path.c_str());
+        result.error = format("Operation failed: %s", key.c_str());
         return result;
     }
 

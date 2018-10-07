@@ -53,7 +53,8 @@ readOnlyStoreRPC(const Store& store,
         uint64_t limit = request.range().limit();
         result = store.range(start_key, end_key, limit, range_store);
 
-        *response.mutable_range()->mutable_contents() = {range_store.begin(), range_store.end()};
+        *response.mutable_range()->mutable_contents()
+                = {range_store.begin(), range_store.end()};
 
     } else if (request.has_search()) {
 
@@ -62,7 +63,8 @@ readOnlyStoreRPC(const Store& store,
         uint64_t limit = request.search().limit();
         result = store.search(search_key, limit, search_store);
 
-        *response.mutable_search()->mutable_contents() = {search_store.begin(), search_store.end()};
+        *response.mutable_search()->mutable_contents()
+                = {search_store.begin(), search_store.end()};
 
 
     } else {

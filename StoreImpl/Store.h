@@ -113,81 +113,77 @@ class Store: public boost::noncopyable {
     bool init();
 
     /**
-     * Write the tree to the given stream.
+     * Write the levelDB store to the given stream.
      */
     void dumpSnapshot(Core::ProtoBuf::OutputStream& stream) const;
 
     /**
-     * Load the tree from the given stream.
+     * Load the total levelDB from the given stream.
      * \warning
-     *      This will blow away any existing files and directories.
+     *      Original levelDB store will remove completedly first.
      */
     void loadSnapshot(Core::ProtoBuf::InputStream& stream);
 
     /**
-     * Verify that the file at path has the given contents.
-     * \param path
+     * Verify that the value at key has the given contents.
+     * Currently only used for filter away KeepAlive RPC.
+     * \param key
      *      The path to the file that must have the contents specified in
-     *      'contents'.
-     * \param contents
-     *      The contents that the file specified by 'path' should have for an
-     *      OK response. An OK response is also returned if 'contents' is the
-     *      empty string and the file specified by 'path' does not exist.
+     *      'content'.
+     * \param content
+     *      The contents that the file specified by 'key' should
+     *      have for an OK response. An OK response is also returned
+     *      if 'content' is the empty string and the file specified
+     *      by 'key' does not exist.
      * \return
      *      Status and error message. Possible errors are:
      *       - CONDITION_NOT_MET upon any error.
      */
     Result
-    checkCondition(const std::string& path,
-                   const std::string& contents = "") const;
+    checkCondition(const std::string& key,
+                   const std::string& content = "") const;
 
     /**
-     * Set the value of a file.
-     * \param path
-     *      The path where there should be a file with the given contents after
-     *      this call.
-     * \param contents
-     *      The new value associated with the file.
+     * Set the value of a key.
+     * \param key
+     *      The key where there should be a file with the given
+     *      content after this call.
+     * \param content
+     *      The new value associated with the key.
      * \return
      *      Status and error message. Possible errors are:
-     *       - INVALID_ARGUMENT if path is malformed.
-     *       - INVALID_ARGUMENT if contents are too large to fit in a file.
-     *       - LOOKUP_ERROR if a parent of path does not exist.
-     *       - TYPE_ERROR if a parent of path is a file.
-     *       - TYPE_ERROR if path exists but is a directory.
+     *       - INVALID_ARGUMENT if key is malformed.
+     *       - OPERATION_ERROR if levelDB operation return fail.
      */
     Result
-    write(const std::string& path, const std::string& contents);
+    write(const std::string& key, const std::string& content);
 
     /**
-     * Get the value of a file.
-     * \param path
-     *      The path of the file whose contents to read.
-     * \param contents
-     *      The current value associated with the file.
+     * Get the value of a key.
+     * \param key
+     *      The key of the file whose content to read.
+     * \param content
+     *      The current value associated with the key.
      * \return
      *      Status and error message. Possible errors are:
-     *       - INVALID_ARGUMENT if path is malformed.
-     *       - LOOKUP_ERROR if a parent of path does not exist.
-     *       - LOOKUP_ERROR if path does not exist.
-     *       - TYPE_ERROR if a parent of path is a file.
-     *       - TYPE_ERROR if path is a directory.
+     *       - INVALID_ARGUMENT if key is malformed.
+     *       - OPERATION_ERROR if levelDB operation return fail.
      */
     Result
-    read(const std::string& path, std::string& contents) const;
+    read(const std::string& key, std::string& content) const;
 
     /**
      * Make sure a file does not exist.
-     * \param path
-     *      The path where there should not be a file after this call.
+     * \param key
+     *      The key where there should not be a file after this
+     *      call.
      * \return
      *      Status and error message. Possible errors are:
      *       - INVALID_ARGUMENT if path is malformed.
-     *       - TYPE_ERROR if a parent of path is a file.
-     *       - TYPE_ERROR if path exists but is a directory.
+     *       - OPERATION_ERROR if levelDB operation return fail.
      */
     Result
-    remove(const std::string& path);
+    remove(const std::string& key);
 
     Result
     range(const std::string& start, const std::string& end, uint64_t limit,
@@ -201,7 +197,8 @@ class Store: public boost::noncopyable {
     stat(const std::string& client, std::string& content) const;
 
     /**
-     * Add metrics about the tree to the given structure.
+     * Add metrics about the levelDB operation to the given
+     * structure.
      */
     void
     updateServerStats(Protocol::ServerStats_Store& tstats) const;

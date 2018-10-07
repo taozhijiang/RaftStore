@@ -8,15 +8,58 @@
 
 #include "RaftStoreClient.h"
 
+namespace tzhttpd {
+namespace http_handler {
+extern std::string http_server_version;
+}
+} // end namespace tzhttpd
+
+extern char * program_invocation_short_name;
+static void usage() {
+    std::stringstream ss;
+
+    ss << program_invocation_short_name << ":" << std::endl;
+    ss << "\t -c cfgFile  specify config file, default RaftStoreHttpSrv.conf " << std::endl;
+    ss << "\t -d          daemonize service" << std::endl;
+    ss << "\t -v          print version info" << std::endl;
+    ss << std::endl;
+
+    std::cout << ss.str();
+}
+
+char cfgFile[PATH_MAX] = "RaftStoreHttpSrv.conf";
+bool daemonize = false;
+
 extern bool raft_store_v1_http_init(std::shared_ptr<tzhttpd::HttpServer>& http_ptr);
 
 int main(int argc, char* argv[]) {
 
-    std::string cfgfile = std::string(program_invocation_short_name) + ".conf";
-    std::cout << "using cfgfile: " << cfgfile << std::endl;
+    int opt_g = 0;
+    while( (opt_g = getopt(argc, argv, "c:dhv")) != -1 ) {
+        switch(opt_g)
+        {
+            case 'c':
+                memset(cfgFile, 0, sizeof(cfgFile));
+                strncpy(cfgFile, optarg, PATH_MAX);
+                break;
+            case 'd':
+                daemonize = true;
+                break;
+            case 'v':
+                std::cout << program_invocation_short_name << ": "
+                    << tzhttpd::http_handler::http_server_version << std::endl;
+                break;
+            case 'h':
+            default:
+                usage();
+                ::exit(EXIT_SUCCESS);
+        }
+    }
+
+    std::cout << "using cfgfile: " << cfgFile << std::endl;
     libconfig::Config cfg;
     try {
-        cfg.readFile(cfgfile.c_str());
+        cfg.readFile(cfgFile);
     } catch(libconfig::FileIOException &fioex) {
         fprintf(stderr, "I/O error while reading file.");
         return -1;
@@ -29,8 +72,24 @@ int main(int argc, char* argv[]) {
     tzhttpd::set_checkpoint_log_store_func(::syslog);
     tzhttpd::tzhttpd_log_init(7);
 
+        // daemonize should before any thread creation...
+    if (daemonize) {
+        std::cout << "We will daemonize this service..." << std::endl;
+        tzhttpd::tzhttpd_log_notice("We will daemonize this service...");
+
+        bool chdir = false; // leave the current working directory in case
+                            // the user has specified relative paths for
+                            // the config file, etc
+        bool close = true;  // close stdin, stdout, stderr
+        if (::daemon(!chdir, !close) != 0) {
+            tzhttpd::tzhttpd_log_err("Call to daemon() failed: %s", strerror(errno));
+            std::cout << "Call to daemon() failed: " << strerror(errno) << std::endl;
+            ::exit(EXIT_FAILURE);
+        }
+    }
+
     std::shared_ptr<tzhttpd::HttpServer> http_server_ptr;
-    http_server_ptr.reset(new tzhttpd::HttpServer(cfgfile, program_invocation_short_name));
+    http_server_ptr.reset(new tzhttpd::HttpServer(cfgFile, program_invocation_short_name));
     if (!http_server_ptr || !http_server_ptr->init()) {
         fprintf(stderr, "Init HttpServer failed!");
         return -1;

@@ -5,7 +5,7 @@ This is a project forked from [logcabin](https://github.com/logcabin/logcabin), 
 To make this project interesting, I have done the fellowing modifications:   
 1. Remove test and mock stuffs, cleaner code may help better understand.   
 2. Using CMake to build the project.   
-3. Remove hierarchical-tree storage in memory, usig persistant flat KV store by [leveldb](https://github.com/google/leveldb). In addition to set, get, remove, also supports range, search.   
+3. Remove hierarchical-tree storage in memory, usig persistant flat KV store by [leveldb](https://github.com/google/leveldb). In addition to set, get, remove, also supports range, search. Snapshot support is also included.   
 4. Add [tzhttpd](https://github.com/taozhijiang/tzhttpd) to support HTTP interface, including HTTP Basic Auth for isolation.
 
 The purpose of the project is helping me better understand Raft Consensus Algorithm.   

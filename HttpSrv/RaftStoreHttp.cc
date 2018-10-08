@@ -80,7 +80,10 @@ int raft_get_handler(const HttpParser& http_parser,
 
     Result result;
     std::string content;
+
     const UriParamContainer& params = http_parser.get_request_uri_params();
+    std::string TYPE = params.VALUE("TYPE");
+    std::string key  = params.VALUE("KEY");
 
     do {
 
@@ -91,41 +94,69 @@ int raft_get_handler(const HttpParser& http_parser,
             break;
         }
 
-        std::string key  = params.VALUE("KEY");
-        std::string TYPE = params.VALUE("TYPE");
         std::string val;
-
-        if (key.empty() || (!TYPE.empty() && TYPE != "base64")) {
+        if (key.empty() || (!TYPE.empty() && TYPE != "base64" && TYPE != "raw")) {
             result = Status::INVALID_ARGUMENT;
             break;
         }
 
         result = RaftStoreClient::Instance().raft_get(dbname + "_" + key, val);
         if (result.status == Status::OK) {
-            if (!TYPE.empty() && TYPE == "base64") {
+            if (TYPE == "base64") {
                 content = CryptoUtil::base64_encode(val);
             } else {
-                if (!TYPE.empty()) {
-                    tzhttpd_log_err("Unknown TYPE: %s", TYPE.c_str());
-                }
                 content = std::move(val);
             }
         }
 
     } while (0);
 
-    Json::Value root;
-    root["CODE"] = static_cast<int>(result.status);
-    root["INFO"] = result.error;
-    if (result.status == Status::OK) {
-        root["VALUE"] = std::move(content);
+    // 对于raw类型的，只有成功才会返回数据，否则返回错误的HTTP信息
+    if (TYPE == "raw") {
+
+        if (result.status != Status::OK) {
+            status_line = http_proto::generate_response_status_line(
+                                http_parser.get_version(), StatusCode::server_error_internal_server_error);
+            return 0;
+        }
+
+        response = std::move(content);
+
+        std::string cp_path = key;
+        boost::to_lower(cp_path);
+        // 取出扩展名
+        std::string::size_type pos = cp_path.rfind(".");
+        std::string suffix {};
+        if (pos != std::string::npos && (cp_path.size() - pos) < 6) {
+            suffix = cp_path.substr(pos);
+        }
+
+        if (!suffix.empty()) {
+
+            std::string content_type = http_proto::find_content_type(suffix);
+            if (!content_type.empty()) {
+                add_header.push_back(content_type);
+                tzhttpd_log_debug("Adding content_type header for %s(%s) -> %s",
+                                  cp_path.c_str(), suffix.c_str(), content_type.c_str());
+            }
+        }
+
+    } else {
+
+        Json::Value root;
+        root["CODE"] = static_cast<int>(result.status);
+        root["INFO"] = result.error;
+        if (result.status == Status::OK) {
+            root["VALUE"] = std::move(content);
+        }
+
+        response    = Json::FastWriter().write(root);
+        add_header  = { "Cache-Control: no-cache",
+                        "Content-type: application/json; charset=utf-8;"};
     }
 
-    response    = Json::FastWriter().write(root);
     status_line = http_proto::generate_response_status_line(
                         http_parser.get_version(), StatusCode::success_ok);
-    add_header  = { "Cache-Control: no-cache",
-                    "Content-type: application/json; charset=utf-8;"};
 
     return 0;
 }
@@ -353,10 +384,10 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
         }
 
         std::string TYPE = root["TYPE"].asString();
-        std::string KEY  = root["KEY"].asString();
+        std::string key  = root["KEY"].asString();
         std::string VALUE= root["VALUE"].asString();
 
-        if (KEY.empty() || VALUE.empty() || (!TYPE.empty() && TYPE != "base64")) {
+        if (key.empty() || VALUE.empty() || (!TYPE.empty() && TYPE != "base64")) {
             tzhttpd_log_err("param error for: %s", post_data.c_str());
             result = Status::INVALID_ARGUMENT;
             break;
@@ -369,7 +400,7 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
             val = std::move(VALUE);
         }
 
-        result = RaftStoreClient::Instance().raft_set(KEY, val);
+        result = RaftStoreClient::Instance().raft_set(dbname + '_' + key, val);
 
     } while (0);
 

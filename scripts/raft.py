@@ -2,6 +2,7 @@
 
 import sys
 
+import base64
 import json
 import requests
 
@@ -30,11 +31,12 @@ RAFT_BASE='http://www.example.com/raftstore/api/dbproject/v1/'
 
 def usage():
     print 'raftstore usage:'
-    print '    raft get    key'
-    print '    raft set    key value'
-    print '    raft rm     key'
-    print '    raft range  start [limit] [end]'
-    print '    raft search key [limit]'
+    print '    raft get  key [type]'
+    print '    raft set  key value'
+    print '    raft setp key file'
+    print '    raft rm   key'
+    print '    raft rng  start [limit] [end]'
+    print '    raft se   key [limit]'
     print ''
     sys.exit()
 
@@ -64,6 +66,30 @@ def set(key, value):
     payload = {'KEY': key, 'VALUE': value}
     res = requests.get(RAFT_BASE+"set", 
                        params = payload,
+                       auth = (RAFT_AUTH_USR, RAFT_AUTH_PASSWD), 
+                       )
+    if res.status_code != 200:
+        print 'HTTP ERROR:' + repr(res.status_code)
+        return
+    
+    msg = res.json()
+    print msg
+
+
+def setp(key, filename):
+    if not key or not filename:
+        usage()
+
+    try:
+        data = open(filename, "r").read()
+        encoded = base64.b64encode(data)
+    except:
+        print 'Read and encode file %s failed' %(filename)
+        return
+
+    payload = {'KEY': key, 'VALUE': encoded, 'TYPE': 'base64'}
+    res = requests.post(RAFT_BASE+"set", 
+                       data = json.dumps(payload),
                        auth = (RAFT_AUTH_USR, RAFT_AUTH_PASSWD), 
                        )
     if res.status_code != 200:
@@ -157,7 +183,10 @@ if __name__ ==  "__main__":
         
     elif cmd == 'set':
         set(arg1, arg2)
-        
+
+    elif cmd == 'setp':
+        setp(arg1, arg2)
+
     elif cmd == 'rm':
         remove(arg1)        
     

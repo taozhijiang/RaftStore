@@ -220,17 +220,18 @@ int raft_range_handler(const HttpParser& http_parser,
                        std::vector<std::string>& add_header) {
 
     Result result;
+    Json::Value resultSets;
     std::vector<std::string> contents;
     const UriParamContainer& params = http_parser.get_request_uri_params();
 
-    do {
+    std::string Uri = http_parser.find_request_header(http_proto::header_options::request_path_info);
+    std::string dbname;
+    if (check_api_v1_uri(Uri, "range", dbname) != 0) {
+        result = Status::INVALID_ARGUMENT;
+        goto ret;
+    }
 
-        std::string Uri = http_parser.find_request_header(http_proto::header_options::request_path_info);
-        std::string dbname;
-        if (check_api_v1_uri(Uri, "range", dbname) != 0) {
-            result = Status::INVALID_ARGUMENT;
-            break;
-        }
+    do {
 
         std::string start_key = params.VALUE("START");
         std::string end_key = params.VALUE("END");
@@ -240,13 +241,15 @@ int raft_range_handler(const HttpParser& http_parser,
                                                         end_key.empty() ? dbname + "~" : dbname + "_" + end_key,
                                                         limit, contents);
 
+        const std::string key_prefix = dbname + "_";
+        for (size_t i = 0; i< contents.size(); i++) {
+            resultSets.append(contents[i].substr(key_prefix.size()));
+        }
+
     } while (0);
 
-    Json::Value resultSets;
-    for (size_t i = 0; i< contents.size(); i++) {
-        resultSets.append(contents[i]);
-    }
 
+ret:
     Json::Value root;
     root["CODE"]  = static_cast<int>(result.status);
     root["INFO"]  = result.error;
@@ -269,9 +272,9 @@ int raft_search_handler(const HttpParser& http_parser,
                        std::vector<std::string>& add_header) {
 
     Result result;
+    Json::Value resultSets;
     std::vector<std::string> contents;
     const UriParamContainer& params = http_parser.get_request_uri_params();
-    Json::Value resultSets;
 
     std::string Uri = http_parser.find_request_header(http_proto::header_options::request_path_info);
     std::string dbname;

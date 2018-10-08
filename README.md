@@ -1,6 +1,6 @@
 # RaftStore 
 
-This is a project forked from [logcabin](https://github.com/logcabin/logcabin), which is a hierarchical-tree memory-based distributed storage service. This project is originally developed by Diego Ongaro, the author of Raft Consensus Algorithm.   
+This is a project forked from [logcabin](https://github.com/logcabin/logcabin), which is a hierarchical-tree memory-based distributed storage service,and it is originally developed by Diego Ongaro, the author of Raft Consensus Algorithm.   
 
 To make this project interesting, I have done the fellowing modifications:   
 1. Remove test and mock stuffs, cleaner code may help better understand.   

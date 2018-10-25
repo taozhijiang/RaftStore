@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
 import sys
+import os.path 
 
 import base64
 import json
 import requests
 
+import hashlib
+import zlib
 
 # These two lines enable debugging at httplib level (requests->urllib3->http.client)
 # You will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
@@ -33,7 +36,7 @@ def usage():
     print 'raftstore usage:'
     print '    raft get  key [type]'
     print '    raft set  key value'
-    print '    raft setp key file'
+    print '    raft setp file'
     print '    raft rm   key'
     print '    raft rng  start [limit] [end]'
     print '    raft se   key [limit]'
@@ -76,18 +79,30 @@ def set(key, value):
     print msg
 
 
-def setp(key, filename):
-    if not key or not filename:
+def setp(filename):
+    if not filename:
         usage()
 
     try:
         data = open(filename, "r").read()
-        encoded = base64.b64encode(data)
-    except:
-        print 'Read and encode file %s failed' %(filename)
+        
+        md = hashlib.md5()   
+        md.update(data)
+        md5sum = md.hexdigest()
+        
+        ext = os.path.splitext(filename)[1]
+        if not ext:
+            ext = '.bin'
+        
+        deflate_compress = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
+        deflate_data = deflate_compress.compress(data) + deflate_compress.flush()
+        encoded = base64.b64encode(deflate_data)
+    except Exception, e:
+        print 'Read and encode file %s failed: %s' %(filename, repr(e))
         return
 
-    payload = {'key': key, 'value': encoded, 'type': 'compact'}
+    key = md5sum + ext
+    payload = {'key': key, 'value': encoded, 'type': 'compact', 'md5sum': md5sum }
     res = requests.post(RAFT_BASE+"set", 
                        data = json.dumps(payload),
                        auth = (RAFT_AUTH_USR, RAFT_AUTH_PASSWD), 
@@ -98,6 +113,11 @@ def setp(key, filename):
     
     msg = res.json()
     print msg
+    
+    # more hints
+    if 'code' in msg and msg['code'] == 0:
+        md5r = msg['md5sum']
+        print RAFT_BASE+'get&key='+key+'&type=raw'  # compact|raw|deflate
     
 def remove(key):
     if not key:
@@ -185,7 +205,7 @@ if __name__ ==  "__main__":
         set(arg1, arg2)
 
     elif cmd == 'setp':
-        setp(arg1, arg2)
+        setp(arg1)
 
     elif cmd == 'rm':
         remove(arg1)        

@@ -84,6 +84,7 @@ int raft_get_handler(const HttpParser& http_parser,
     const UriParamContainer& params = http_parser.get_request_uri_params();
     // compact: 先使用deflate压缩，然后使用base64编码，数据放在json当中
     // raw:     原始数据直接返回，而且会根据文件名添加application header
+    // deflate: 数据使用deflate压缩返回，而且会根据文件名添加application header
     std::string TYPE = params.VALUE("type");
     std::string KEY  = params.VALUE("key");
 
@@ -97,7 +98,7 @@ int raft_get_handler(const HttpParser& http_parser,
         }
 
         std::string val;
-        if (KEY.empty() || (!TYPE.empty() && TYPE != "compact" && TYPE != "raw")) {
+        if (KEY.empty() || (!TYPE.empty() && TYPE != "compact" && TYPE != "raw" && TYPE != "deflate")) {
             result = Status::INVALID_ARGUMENT;
             break;
         }
@@ -106,6 +107,9 @@ int raft_get_handler(const HttpParser& http_parser,
         if (result.status == Status::OK) {
             if (TYPE == "compact") {
                 content = CryptoUtil::base64_encode(CryptoUtil::Deflator(val));
+            } else if (TYPE == "deflate") {
+                content = CryptoUtil::Deflator(val);
+                add_header.push_back("Content-Encoding: deflate");
             } else {
                 content = std::move(val);
             }
@@ -114,7 +118,7 @@ int raft_get_handler(const HttpParser& http_parser,
     } while (0);
 
     // 对于raw类型的，只有成功才会返回数据，否则返回错误的HTTP信息
-    if (TYPE == "raw") {
+    if (TYPE == "raw" || TYPE == "deflate") {
 
         if (result.status != Status::OK) {
             status_line = http_proto::generate_response_status_line(
@@ -392,7 +396,7 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
         std::string VALUE  = root["value"].asString();
         std::string MD5SUM = root["md5sum"].asString();
 
-        if (KEY.empty() || VALUE.empty() || (!TYPE.empty() && TYPE != "compact")) {
+        if (KEY.empty() || VALUE.empty() || MD5SUM.empty() || (!TYPE.empty() && TYPE != "compact")) {
             tzhttpd_log_err("param error for: %s", post_data.c_str());
             result = Status::INVALID_ARGUMENT;
             break;
@@ -400,7 +404,7 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
 
         std::string val;
         if (TYPE == "compact") {
-            val = CryptoUtil::base64_decode(CryptoUtil::Inflator(VALUE));
+            val = CryptoUtil::Inflator(CryptoUtil::base64_decode(VALUE));
         } else {
             val = std::move(VALUE);
         }
@@ -411,7 +415,7 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
             break;
         }
 
-        md5sum = CryptoUtil::md5(val);
+        md5sum = CryptoUtil::to_hex_string(CryptoUtil::md5(val));
         if (!boost::iequals(md5sum, MD5SUM)) {
             tzhttpd_log_err("data MD5SUM check error, expect:%s, get:%s",
                             MD5SUM.c_str(), md5sum.c_str());

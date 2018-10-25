@@ -47,7 +47,7 @@ exec_program( "export BUILD_VAR=`git log -1 --pretty=%cd` && echo 'const char *b
 exec_program( "export BUILD_VAR=`git log -1 --pretty=\"%an %ae\"` && echo 'const char *build_commit_author = \"VCS: Author:' $BUILD_VAR '\";' >> build_version.cc ")
 exec_program( "export BUILD_VAR=`date` && echo 'const char *build_time = \"Build At:' $BUILD_VAR '\";' >> build_version.cc ")
 
-add_executable( RaftCabinSrv Main.cc build_version.cc )
+add_executable( RaftStoreSrv Main.cc build_version.cc )
 
 # ld iconv ?
 
@@ -56,7 +56,7 @@ set (EXTRA_LIBS ${EXTRA_LIBS} leveldb snappy )
 set (EXTRA_LIBS ${EXTRA_LIBS} pthread )
 set (EXTRA_LIBS ${EXTRA_LIBS} cryptopp protoc protobuf )
 
-target_link_libraries( RaftCabinSrv -lrt -rdynamic -ldl
+target_link_libraries( RaftStoreSrv -lrt -rdynamic -ldl
     -Wl,--whole-archive ${WHOLE_LIBS} -Wl,--no-whole-archive
     ${EXTRA_LIBS}
 )

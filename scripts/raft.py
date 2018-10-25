@@ -117,7 +117,7 @@ def setp(filename):
     # more hints
     if 'code' in msg and msg['code'] == 0:
         md5r = msg['md5sum']
-        print RAFT_BASE+'get&key='+key+'&type=raw'  # compact|raw|deflate
+        print RAFT_BASE+'get?key='+key+'&type=raw'  # compact|raw|deflate
     
 def remove(key):
     if not key:

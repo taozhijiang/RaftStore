@@ -43,7 +43,7 @@ def usage():
 def get(key):
     if not key:
         usage()
-    payload = {'KEY': key}
+    payload = {'key': key}
     res = requests.get(RAFT_BASE+"get", 
                        params = payload,
                        auth = (RAFT_AUTH_USR, RAFT_AUTH_PASSWD), 
@@ -53,17 +53,17 @@ def get(key):
         return
     
     msg = res.json()
-    if msg['CODE'] != 0:
+    if msg['code'] != 0:
         print msg
         return
-    print msg['VALUE']
+    print msg['value']
     
     
     
 def set(key, value):
     if not key or not value:
         usage()
-    payload = {'KEY': key, 'VALUE': value}
+    payload = {'key': key, 'value': value}
     res = requests.get(RAFT_BASE+"set", 
                        params = payload,
                        auth = (RAFT_AUTH_USR, RAFT_AUTH_PASSWD), 
@@ -87,7 +87,7 @@ def setp(key, filename):
         print 'Read and encode file %s failed' %(filename)
         return
 
-    payload = {'KEY': key, 'VALUE': encoded, 'TYPE': 'base64'}
+    payload = {'key': key, 'value': encoded, 'type': 'compact'}
     res = requests.post(RAFT_BASE+"set", 
                        data = json.dumps(payload),
                        auth = (RAFT_AUTH_USR, RAFT_AUTH_PASSWD), 
@@ -102,7 +102,7 @@ def setp(key, filename):
 def remove(key):
     if not key:
         usage()
-    payload = {'KEY': key}
+    payload = {'key': key}
     res = requests.get(RAFT_BASE+"remove", 
                        params = payload,
                        auth = (RAFT_AUTH_USR, RAFT_AUTH_PASSWD), 
@@ -117,11 +117,11 @@ def remove(key):
 def rng(start, limit, end):
     payload = {}
     if start:
-        payload['START'] = start
+        payload['start'] = start
     if limit:
-        payload['LIMIT'] = int(limit)
+        payload['limit'] = int(limit)
     if end:
-        payload['END'] = end
+        payload['end'] = end
         
     res = requests.get(RAFT_BASE+"range", 
                        params = payload,
@@ -132,10 +132,10 @@ def rng(start, limit, end):
         return
     
     msg = res.json()
-    if msg['CODE'] != 0 or 'VALUE' not in msg:
+    if msg['code'] != 0 or 'value' not in msg:
         print msg
         return
-    ls = json.loads(msg['VALUE'])
+    ls = json.loads(msg['value'])
     for item in ls:
         print item
     
@@ -143,9 +143,9 @@ def search(key, limit):
     if not key:
         usage()
         
-    payload = {'SEARCH': key}
+    payload = {'search': key}
     if limit:
-        payload['LIMIT'] = int(limit)
+        payload['limit'] = int(limit)
         
     res = requests.get(RAFT_BASE+"search", 
                        params = payload,
@@ -156,10 +156,10 @@ def search(key, limit):
         return
     
     msg = res.json()
-    if msg['CODE'] != 0 or 'VALUE' not in msg:
+    if msg['code'] != 0 or 'value' not in msg:
         print msg
         return
-    ls = json.loads(msg['VALUE'])
+    ls = json.loads(msg['value'])
     for item in ls:
         print item
 

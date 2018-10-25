@@ -6,7 +6,7 @@ VERSION  = 1.0
 PACKAGE  = RaftStoreHttpSrv
 EXTRAFLAGS  = -I../libRaft/include -I.. -I../../xtra_rhel6.x/include
 EXTRAFLAGS += -L../../xtra_rhel6.x/libs/protobuf-2.5.0 -L../../xtra_rhel6.x/libs/boost -L../../xtra_rhel6.x/libs
-XLDFLAGS    = ../build/libRaft/libRaft.a ../build/StoreImpl/libStoreImpl.a ../build/tzhttpd/libtzhttpd.a -lprotoc -lprotobuf -lpthread -lboost_system -lboost_thread -lboost_date_time -lboost_regex -lpthread -ljsoncpp -lrt -ldl -lconfig++ -lssl
+XLDFLAGS    = ../build/libRaft/libRaft.a ../build/StoreImpl/libStoreImpl.a ../build/tzhttpd/libtzhttpd.a -lprotoc -lprotobuf -lpthread -lboost_system -lboost_thread -lboost_date_time -lboost_regex -lpthread -ljsoncpp -lrt -ldl -lconfig++ -lssl -lcryptopp
 
 
 OBJ_DIR    = ./obj

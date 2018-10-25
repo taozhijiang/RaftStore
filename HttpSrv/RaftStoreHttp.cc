@@ -48,9 +48,9 @@ int raft_stat_handler(const HttpParser& http_parser,
 
     do {
 
-        std::string client = params.VALUE("CLIENT");
+        std::string CLIENT = params.VALUE("client");
         std::string stat;
-        result = RaftStoreClient::Instance().raft_stat(client, stat);
+        result = RaftStoreClient::Instance().raft_stat(CLIENT, stat);
         if (result.status == Status::OK) {
             content = std::move(stat);
         }
@@ -58,10 +58,10 @@ int raft_stat_handler(const HttpParser& http_parser,
     } while (0);
 
     Json::Value root;
-    root["CODE"] = static_cast<int>(result.status);
-    root["INFO"] = result.error;
+    root["code"] = static_cast<int>(result.status);
+    root["info"] = result.error;
     if (result.status == Status::OK) {
-        root["VALUE"] = std::move(content);
+        root["value"] = std::move(content);
     }
 
     response    = Json::FastWriter().write(root);
@@ -82,8 +82,10 @@ int raft_get_handler(const HttpParser& http_parser,
     std::string content;
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
-    std::string TYPE = params.VALUE("TYPE");
-    std::string key  = params.VALUE("KEY");
+    // compact: 先使用deflate压缩，然后使用base64编码，数据放在json当中
+    // raw:     原始数据直接返回，而且会根据文件名添加application header
+    std::string TYPE = params.VALUE("type");
+    std::string KEY  = params.VALUE("key");
 
     do {
 
@@ -95,15 +97,15 @@ int raft_get_handler(const HttpParser& http_parser,
         }
 
         std::string val;
-        if (key.empty() || (!TYPE.empty() && TYPE != "base64" && TYPE != "raw")) {
+        if (KEY.empty() || (!TYPE.empty() && TYPE != "compact" && TYPE != "raw")) {
             result = Status::INVALID_ARGUMENT;
             break;
         }
 
-        result = RaftStoreClient::Instance().raft_get(dbname + "_" + key, val);
+        result = RaftStoreClient::Instance().raft_get(dbname + "_" + KEY, val);
         if (result.status == Status::OK) {
-            if (TYPE == "base64") {
-                content = CryptoUtil::base64_encode(val);
+            if (TYPE == "compact") {
+                content = CryptoUtil::base64_encode(CryptoUtil::Deflator(val));
             } else {
                 content = std::move(val);
             }
@@ -122,7 +124,7 @@ int raft_get_handler(const HttpParser& http_parser,
 
         response = std::move(content);
 
-        std::string cp_path = key;
+        std::string cp_path = KEY;
         boost::to_lower(cp_path);
         // 取出扩展名
         std::string::size_type pos = cp_path.rfind(".");
@@ -144,10 +146,10 @@ int raft_get_handler(const HttpParser& http_parser,
     } else {
 
         Json::Value root;
-        root["CODE"] = static_cast<int>(result.status);
-        root["INFO"] = result.error;
+        root["code"] = static_cast<int>(result.status);
+        root["info"] = result.error;
         if (result.status == Status::OK) {
-            root["VALUE"] = std::move(content);
+            root["value"] = std::move(content);
         }
 
         response    = Json::FastWriter().write(root);
@@ -161,6 +163,7 @@ int raft_get_handler(const HttpParser& http_parser,
     return 0;
 }
 
+// 只处理VALUE是简单字符的情况，VALUE会自动被urlencode
 static
 int raft_set_handler(const HttpParser& http_parser,
                      std::string& response, std::string& status_line,
@@ -178,21 +181,21 @@ int raft_set_handler(const HttpParser& http_parser,
             break;
         }
 
-        std::string key = params.VALUE("KEY");
-        std::string val = params.VALUE("VALUE");
+        std::string KEY   = params.VALUE("key");
+        std::string VALUE = params.VALUE("value");
 
-        if (key.empty() || val.empty()) {
+        if (KEY.empty() || VALUE.empty()) {
             result = Status::INVALID_ARGUMENT;
             break;
         }
 
-        result = RaftStoreClient::Instance().raft_set(dbname + "_" + key, val);
+        result = RaftStoreClient::Instance().raft_set(dbname + "_" + KEY, VALUE);
 
     } while (0);
 
     Json::Value root;
-    root["CODE"] = static_cast<int>(result.status);
-    root["INFO"]  = result.error;
+    root["code"] = static_cast<int>(result.status);
+    root["info"]  = result.error;
 
     response    = Json::FastWriter().write(root);
     status_line = http_proto::generate_response_status_line(
@@ -221,7 +224,7 @@ int raft_remove_handler(const HttpParser& http_parser,
             break;
         }
 
-        std::string key = params.VALUE("KEY");
+        std::string key = params.VALUE("key");
         if(key.empty()) {
             result = Status::INVALID_ARGUMENT;
             break;
@@ -232,8 +235,8 @@ int raft_remove_handler(const HttpParser& http_parser,
     } while (0);
 
     Json::Value root;
-    root["CODE"] = static_cast<int>(result.status);
-    root["INFO"]  = result.error;
+    root["code"] = static_cast<int>(result.status);
+    root["info"]  = result.error;
 
     response    = Json::FastWriter().write(root);
     status_line = http_proto::generate_response_status_line(
@@ -264,13 +267,13 @@ int raft_range_handler(const HttpParser& http_parser,
 
     do {
 
-        std::string start_key = params.VALUE("START");
-        std::string end_key = params.VALUE("END");
-        auto limit_s = params.VALUE("LIMIT");
-        uint64_t limit = limit_s.empty() ? 0 : ::atoll(limit_s.c_str());
-        result = RaftStoreClient::Instance().raft_range(dbname + "_" + start_key,
-                                                        end_key.empty() ? dbname + "~" : dbname + "_" + end_key,
-                                                        limit, contents);
+        std::string START_KEY = params.VALUE("start");
+        std::string END_KEY   = params.VALUE("end");
+        auto limit_s = params.VALUE("limit");
+        uint64_t LIMIT = limit_s.empty() ? 0 : ::atoll(limit_s.c_str());
+        result = RaftStoreClient::Instance().raft_range(dbname + "_" + START_KEY,
+                                                        END_KEY.empty() ? dbname + "~" : dbname + "_" + END_KEY,
+                                                        LIMIT, contents);
 
         const std::string key_prefix = dbname + "_";
         for (size_t i = 0; i< contents.size(); i++) {
@@ -282,10 +285,10 @@ int raft_range_handler(const HttpParser& http_parser,
 
 ret:
     Json::Value root;
-    root["CODE"]  = static_cast<int>(result.status);
-    root["INFO"]  = result.error;
+    root["code"]  = static_cast<int>(result.status);
+    root["info"]  = result.error;
     if (!resultSets.empty()) {
-        root["VALUE"] = Json::FastWriter().write(resultSets);
+        root["value"] = Json::FastWriter().write(resultSets);
     }
 
     response    = Json::FastWriter().write(root);
@@ -316,10 +319,10 @@ int raft_search_handler(const HttpParser& http_parser,
 
     do {
 
-        std::string search_key = params.VALUE("SEARCH");
-        auto limit_s = params.VALUE("LIMIT");
-        uint64_t limit = limit_s.empty() ? 0 : ::atoll(limit_s.c_str());
-        result = RaftStoreClient::Instance().raft_search(search_key, limit, contents);
+        std::string SEARCH_KEY = params.VALUE("search");
+        auto limit_s = params.VALUE("limit");
+        uint64_t LIMIT = limit_s.empty() ? 0 : ::atoll(limit_s.c_str());
+        result = RaftStoreClient::Instance().raft_search(SEARCH_KEY, LIMIT, contents);
 
         // 这里在应用层进行dbname的prefix过滤
         // 将搜索操作放到底层range搜索会更高效，目前使用这种简单的方式先实现功能
@@ -341,10 +344,10 @@ int raft_search_handler(const HttpParser& http_parser,
 
 ret:
     Json::Value root;
-    root["CODE"] = static_cast<int>(result.status);
-    root["INFO"]  = result.error;
+    root["code"] = static_cast<int>(result.status);
+    root["info"]  = result.error;
     if (!resultSets.empty()) {
-        root["VALUE"] = Json::FastWriter().write(resultSets);
+        root["value"] = Json::FastWriter().write(resultSets);
     }
 
     response    = Json::FastWriter().write(root);
@@ -357,7 +360,7 @@ ret:
 }
 
 
-
+// POST方式，处理复杂的数据上传请求
 static
 int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_data,
                          std::string& response, std::string& status_line,
@@ -365,6 +368,7 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
 
     Result result;
     const UriParamContainer& params = http_parser.get_request_uri_params();
+    std::string md5sum;
 
     do {
 
@@ -383,30 +387,48 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
             break;
         }
 
-        std::string TYPE = root["TYPE"].asString();
-        std::string key  = root["KEY"].asString();
-        std::string VALUE= root["VALUE"].asString();
+        std::string TYPE   = root["type"].asString();
+        std::string KEY    = root["key"].asString();
+        std::string VALUE  = root["value"].asString();
+        std::string MD5SUM = root["md5sum"].asString();
 
-        if (key.empty() || VALUE.empty() || (!TYPE.empty() && TYPE != "base64")) {
+        if (KEY.empty() || VALUE.empty() || (!TYPE.empty() && TYPE != "compact")) {
             tzhttpd_log_err("param error for: %s", post_data.c_str());
             result = Status::INVALID_ARGUMENT;
             break;
         }
 
         std::string val;
-        if (TYPE == "base64") {
-            val = CryptoUtil::base64_decode(VALUE);
+        if (TYPE == "compact") {
+            val = CryptoUtil::base64_decode(CryptoUtil::Inflator(VALUE));
         } else {
             val = std::move(VALUE);
         }
 
-        result = RaftStoreClient::Instance().raft_set(dbname + '_' + key, val);
+        if (val.empty()) {
+            tzhttpd_log_err("final empty value for: %s", post_data.c_str());
+            result = Status::INVALID_ARGUMENT;
+            break;
+        }
+
+        md5sum = CryptoUtil::md5(val);
+        if (!boost::iequals(md5sum, MD5SUM)) {
+            tzhttpd_log_err("data MD5SUM check error, expect:%s, get:%s",
+                            MD5SUM.c_str(), md5sum.c_str());
+            result = Status::INVALID_ARGUMENT;
+            break;
+        }
+
+        result = RaftStoreClient::Instance().raft_set(dbname + '_' + KEY, val);
 
     } while (0);
 
     Json::Value root;
-    root["CODE"] = static_cast<int>(result.status);
-    root["INFO"] = result.error;
+    root["code"] = static_cast<int>(result.status);
+    root["info"] = result.error;
+    if(result.status == Status::OK && !md5sum.empty()) {
+        root["md5sum"] = md5sum;
+    }
 
     response    = Json::FastWriter().write(root);
     status_line = http_proto::generate_response_status_line(

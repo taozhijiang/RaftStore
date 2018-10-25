@@ -32,14 +32,21 @@ RAFT_AUTH_USR='usr'
 RAFT_AUTH_PASSWD='passwd'
 RAFT_BASE='http://www.example.com/raftstore/api/dbproject/v1/'
 
+# static
+RAFT_STATIC_AUTH_USR='usr'
+RAFT_STATIC_AUTH_PASSWD='passwd'
+RAFT_STATIC_BASE='http://www.example.com/raftstore/api/static/v1/'
+
+
 def usage():
     print 'raftstore usage:'
-    print '    raft get  key [type]'
-    print '    raft set  key value'
-    print '    raft setp file'
-    print '    raft rm   key'
-    print '    raft rng  start [limit] [end]'
-    print '    raft se   key [limit]'
+    print '    raft get      key [type]'
+    print '    raft set      key value'
+    print '    raft setp     filename [key]'
+    print '    raft upload   filename [key]'
+    print '    raft rm       key'
+    print '    raft rng      start [limit] [end]'
+    print '    raft se       key [limit]'
     print ''
     sys.exit()
 
@@ -79,7 +86,7 @@ def set(key, value):
     print msg
 
 
-def setp(filename):
+def setp(filename, key):
     if not filename:
         usage()
 
@@ -90,9 +97,11 @@ def setp(filename):
         md.update(data)
         md5sum = md.hexdigest()
         
-        ext = os.path.splitext(filename)[1]
-        if not ext:
-            ext = '.bin'
+        if not key:
+            ext = os.path.splitext(filename)[1]
+            if not ext:
+                ext = '.bin'
+            key = md5sum + ext
         
         deflate_compress = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
         deflate_data = deflate_compress.compress(data) + deflate_compress.flush()
@@ -101,7 +110,6 @@ def setp(filename):
         print 'Read and encode file %s failed: %s' %(filename, repr(e))
         return
 
-    key = md5sum + ext
     payload = {'key': key, 'value': encoded, 'type': 'compact', 'md5sum': md5sum }
     res = requests.post(RAFT_BASE+"set", 
                        data = json.dumps(payload),
@@ -117,7 +125,56 @@ def setp(filename):
     # more hints
     if 'code' in msg and msg['code'] == 0:
         md5r = msg['md5sum']
+        if md5r != md5sum:
+            print 'ERR: md5sum mismatch: %s - %s' %(md5r, md5sum)
+            return
         print RAFT_BASE+'get?key='+key+'&type=raw'  # compact|raw|deflate
+
+
+def upload(filename, key):
+    if not filename:
+        usage()
+
+    try:
+        data = open(filename, "r").read()
+        
+        md = hashlib.md5()   
+        md.update(data)
+        md5sum = md.hexdigest()
+        
+        if not key:
+            ext = os.path.splitext(filename)[1]
+            if not ext:
+                ext = '.bin'
+            key = md5sum + ext
+        
+        deflate_compress = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
+        deflate_data = deflate_compress.compress(data) + deflate_compress.flush()
+        encoded = base64.b64encode(deflate_data)
+    except Exception, e:
+        print 'Read and encode file %s failed: %s' %(filename, repr(e))
+        return
+
+
+    payload = {'key': key, 'value': encoded, 'type': 'compact', 'md5sum': md5sum }
+    res = requests.post(RAFT_STATIC_BASE+"set", 
+                       data = json.dumps(payload),
+                       auth = (RAFT_STATIC_AUTH_USR, RAFT_STATIC_AUTH_PASSWD), 
+                       )
+    if res.status_code != 200:
+        print 'HTTP ERROR:' + repr(res.status_code)
+        return
+    
+    msg = res.json()
+    print msg
+    
+    # more hints
+    if 'code' in msg and msg['code'] == 0:
+        md5r = msg['md5sum']
+        if md5r != md5sum:
+            print 'ERR: md5sum mismatch: %s - %s' %(md5r, md5sum)
+            return
+        print RAFT_STATIC_BASE+'get?key='+key+'&type=raw'  # compact|raw|deflate
     
 def remove(key):
     if not key:
@@ -205,7 +262,10 @@ if __name__ ==  "__main__":
         set(arg1, arg2)
 
     elif cmd == 'setp':
-        setp(arg1)
+        setp(arg1, arg2)
+
+    elif cmd == 'upload':
+        upload(arg1, arg2)
 
     elif cmd == 'rm':
         remove(arg1)        

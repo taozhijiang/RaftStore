@@ -43,8 +43,9 @@ ALLSERVERS=127.0.0.1:5254,127.0.0.1:5255,127.0.0.1:5256
 
 All should be done, enjoy!    
 ```bash
-GET /raftstore/api/Leshua/v1/set?KEY=test&VALUE=wwwxzf
-GET /raftstore/api/Leshua/v1/get?KEY=test
-GET /raftstore/api/Leshua/v1/search?SEARCH=te
-GET /raftstore/api/Leshua/v1/range
+GET /raftstore/api/dbname/v1/set?key=test&value=wwwxzf
+GET /raftstore/api/dbname/v1/get?key=test
+GET /raftstore/api/dbname/v1/search?search=te
+GET /raftstore/api/dbname/v1/range
 ```
+More info can be found in /scripts directory.

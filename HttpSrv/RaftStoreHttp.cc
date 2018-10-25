@@ -431,7 +431,7 @@ int raftpost_set_handler(const HttpParser& http_parser, const std::string& post_
     root["code"] = static_cast<int>(result.status);
     root["info"] = result.error;
     if(result.status == Status::OK && !md5sum.empty()) {
-        root["md5sum"] = md5sum;
+        root["md5sum"] = MD5SUM;  // 返回原始传来的md5，防止大小写问题
     }
 
     response    = Json::FastWriter().write(root);

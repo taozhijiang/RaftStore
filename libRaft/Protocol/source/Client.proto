@@ -366,28 +366,6 @@ message GetServerInfo {
 
 
 /**
- * AdvanceStateMachineVersion state machine command: changes state machine
- * behavior to the given version, if and only if the requested_version is
- * greater than the state machine's current version. This is currently only
- * used internally by the Raft servers. It is not currently sent by the client
- * library, rather it is appended by the Raft leader automatically as needed.
- */
-message AdvanceStateMachineVersion {
-    message Request {
-        required uint32 requested_version = 1;
-    }
-    message Response {
-        /**
-         * The version of the state machine behavior that the replicated state
-         * machine is running after applying this command (this will be at
-         * least the requested version, but may be higher if the state machine
-         * was already running a higher version).
-         */
-        required uint32 running_version = 1;
-    }
-}
-
-/**
  * StateMachineCommand RPC from clients that is processed by the replicated
  * state machine.
  */
@@ -400,7 +378,6 @@ message StateMachineCommand {
         // The following are mutually exclusive.
         optional OpenSession.Request open_session = 1;
         optional CloseSession.Request close_session = 4;
-        optional AdvanceStateMachineVersion.Request advance_version = 3;
 
         optional ReadWriteStore.Request store = 2;
     }
@@ -412,7 +389,6 @@ message StateMachineCommand {
         // The following are mutually exclusive.
         optional OpenSession.Response open_session = 1;
         optional CloseSession.Response close_session = 4;
-        optional AdvanceStateMachineVersion.Response advance_version = 3;
 
         optional ReadWriteStore.Response store = 2;
     }

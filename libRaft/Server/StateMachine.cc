@@ -79,25 +79,17 @@ StateMachine::StateMachine(std::shared_ptr<RaftConsensus> consensus,
     , numUnknownRequestsSinceLastMessage(0)
     , numSnapshotsAttempted(0)
     , numSnapshotsFailed(0)
-    , numRedundantAdvanceVersionEntries(0)
-    , numRejectedAdvanceVersionEntries(0)
-    , numSuccessfulAdvanceVersionEntries(0)
-    , numTotalAdvanceVersionEntries(0)
     , isSnapshotRequested(false)
     , maySnapshotAt(TimePoint::min())
     , sessions()
-    , store(config.read<std::string>("storagePath", "storage") + "/server" + 
-            std::to_string(static_cast<long long unsigned int>(config.read<uint64_t>("serverId"))) + 
+    , store(config.read<std::string>("storagePath", "storage") + "/server" +
+            std::to_string(static_cast<long long unsigned int>(config.read<uint64_t>("serverId"))) +
             "/leveldb")
-    , versionHistory()
     , writer()
     , applyThread()
     , snapshotThread()
     , snapshotWatchdogThread()
 {
-    versionHistory.insert({0, 1});
-    consensus->setSupportedStateMachineVersions(MIN_SUPPORTED_VERSION,
-                                                MAX_SUPPORTED_VERSION);
     if (!stateMachineSuppressThreads) {
         applyThread = std::thread(&StateMachine::applyThreadMain, this);
         snapshotThread = std::thread(&StateMachine::snapshotThreadMain, this);
@@ -153,17 +145,6 @@ StateMachine::updateServerStats(Protocol::ServerStats& serverStats) const
     smStats.set_num_unknown_requests(numUnknownRequests);
     smStats.set_num_snapshots_attempted(numSnapshotsAttempted);
     smStats.set_num_snapshots_failed(numSnapshotsFailed);
-    smStats.set_num_redundant_advance_version_entries(
-        numRedundantAdvanceVersionEntries);
-    smStats.set_num_rejected_advance_version_entries(
-        numRejectedAdvanceVersionEntries);
-    smStats.set_num_successful_advance_version_entries(
-        numSuccessfulAdvanceVersionEntries);
-    smStats.set_num_total_advance_version_entries(
-        numTotalAdvanceVersionEntries);
-    smStats.set_min_supported_version(MIN_SUPPORTED_VERSION);
-    smStats.set_max_supported_version(MAX_SUPPORTED_VERSION);
-    smStats.set_running_version(getVersion(lastApplied));
     smStats.set_may_snapshot_at(time.unixNanos(maySnapshotAt));
     store.updateServerStats(*smStats.mutable_store());
 }
@@ -184,12 +165,6 @@ StateMachine::waitForResponse(uint64_t logIndex,
     std::unique_lock<Core::Mutex> lockGuard(mutex);
     while (lastApplied < logIndex)
         entriesApplied.wait(lockGuard);
-
-    // Need to check whether we understood the request at the time it
-    // was applied using getVersion(logIndex), then reply and return true/false
-    // based on that. Existing commands have been around since version 1, so we
-    // skip this check for now.
-    uint16_t versionThen = getVersion(logIndex);
 
     if (command.has_store()) {
         const PC::ExactlyOnceRPCInfo& rpcInfo = command.store().exactly_once();
@@ -219,12 +194,8 @@ StateMachine::waitForResponse(uint64_t logIndex,
         response.mutable_open_session()->
             set_client_id(logIndex);
         return true;
-    } else if (versionThen >= 2 && command.has_close_session()) {
+    } else if (command.has_close_session()) {
         response.mutable_close_session(); // no fields to set
-        return true;
-    } else if (command.has_advance_version()) {
-        response.mutable_advance_version()->
-            set_running_version(versionThen);
         return true;
     }
     // don't warnUnknownRequest here, since we already did so in apply()
@@ -312,7 +283,7 @@ StateMachine::apply(const RaftConsensus::Entry& entry)
         PANIC("Failed to parse protobuf for entry %lu",
               entry.index);
     }
-    uint16_t runningVersion = getVersion(entry.index - 1);
+
     if (command.has_store()) {
         PC::ExactlyOnceRPCInfo rpcInfo = command.store().exactly_once();
         auto it = sessions.find(rpcInfo.client_id());
@@ -344,44 +315,7 @@ StateMachine::apply(const RaftConsensus::Entry& entry)
         Session& session = sessions.insert({clientId, {}}).first->second;
         session.lastModified = entry.clusterTime;
     } else if (command.has_close_session()) {
-        if (runningVersion >= 2) {
-            sessions.erase(command.close_session().client_id());
-        } else {
-            // Command is ignored in version < 2.
-            warnUnknownRequest(command, "may not process the given request, "
-                               "which was introduced in version 2");
-        }
-    } else if (command.has_advance_version()) {
-        uint16_t requested = Core::Util::downCast<uint16_t>(
-                command.advance_version(). requested_version());
-        if (requested < runningVersion) {
-            WARNING("Rejecting downgrade of state machine version "
-                    "(running version %u but command at log index %lu wants "
-                    "to switch to version %u)",
-                    runningVersion,
-                    entry.index,
-                    requested);
-            ++numRejectedAdvanceVersionEntries;
-        } else if (requested > runningVersion) {
-            if (requested > MAX_SUPPORTED_VERSION) {
-                PANIC("Cannot upgrade state machine to version %u (from %u) "
-                      "because this code only supports up to version %u",
-                      requested,
-                      runningVersion,
-                      MAX_SUPPORTED_VERSION);
-            } else {
-                NOTICE("Upgrading state machine to version %u (from %u)",
-                       requested,
-                       runningVersion);
-                versionHistory.insert({entry.index, requested});
-            }
-            ++numSuccessfulAdvanceVersionEntries;
-        } else { // requested == runningVersion
-            // nothing to do
-            // If this stat is high, see note in RaftConsensus.cc.
-            ++numRedundantAdvanceVersionEntries;
-        }
-        ++numTotalAdvanceVersionEntries;
+        sessions.erase(command.close_session().client_id());
     } else { // unknown command
         // This is (deterministically) ignored by all state machines running
         // the current version.
@@ -485,14 +419,6 @@ StateMachine::expireSessions(uint64_t clusterTime)
     }
 }
 
-uint16_t
-StateMachine::getVersion(uint64_t logIndex) const
-{
-    auto it = versionHistory.upper_bound(logIndex);
-    --it;
-    return it->second;
-}
-
 void
 StateMachine::killSnapshotProcess(Core::HoldingMutex holdingMutex,
                                   int signum)
@@ -550,50 +476,11 @@ StateMachine::loadSnapshot(Core::ProtoBuf::InputStream& stream)
             PANIC("Couldn't read state machine header from snapshot: %s",
                   error.c_str());
         }
-        loadVersionHistory(header);
         loadSessions(header);
     }
 
     // Load the tree's state
     store.loadSnapshot(stream);
-}
-
-void
-StateMachine::loadVersionHistory(const SnapshotStateMachine::Header& header)
-{
-    versionHistory.clear();
-    versionHistory.insert({0, 1});
-    for (auto it = header.version_update().begin();
-         it != header.version_update().end();
-         ++it) {
-        versionHistory.insert({it->log_index(),
-                               Core::Util::downCast<uint16_t>(it->version())});
-    }
-
-    // The version of the current state machine behavior.
-    uint16_t running = versionHistory.rbegin()->second;
-    if (running < MIN_SUPPORTED_VERSION ||
-        running > MAX_SUPPORTED_VERSION) {
-        PANIC("State machine version read from snapshot was %u, but this "
-              "code only supports %u through %u (inclusive)",
-              running,
-              MIN_SUPPORTED_VERSION,
-              MAX_SUPPORTED_VERSION);
-    }
-}
-
-void
-StateMachine::serializeVersionHistory(
-        SnapshotStateMachine::Header& header) const
-{
-    for (auto it = versionHistory.begin();
-         it != versionHistory.end();
-         ++it) {
-        SnapshotStateMachine::VersionUpdate& update =
-            *header.add_version_update();
-        update.set_log_index(it->first);
-        update.set_version(it->second);
-    }
 }
 
 bool
@@ -761,7 +648,6 @@ StateMachine::takeSnapshot(uint64_t lastIncludedIndex,
         // StateMachine state comes next
         {
             SnapshotStateMachine::Header header;
-            serializeVersionHistory(header);
             serializeSessions(header);
             writer->writeMessage(header);
         }
@@ -820,16 +706,14 @@ StateMachine::warnUnknownRequest(
     if (lastUnknownRequestMessage + unknownRequestMessageBackoff < now) {
         lastUnknownRequestMessage = now;
         if (numUnknownRequestsSinceLastMessage > 0) {
-            WARNING("This version of the state machine (%u) %s "
+            WARNING("This version of the state machine () %s "
                     "(and %lu similar warnings "
                     "were suppressed since the last message): %s",
-                    getVersion(~0UL),
                     reason,
                     numUnknownRequestsSinceLastMessage,
                     Core::ProtoBuf::dumpString(request).c_str());
         } else {
-            WARNING("This version of the state machine (%u) %s: %s",
-                    getVersion(~0UL),
+            WARNING("This version of the state machine () %s: %s",
                     reason,
                     Core::ProtoBuf::dumpString(request).c_str());
         }

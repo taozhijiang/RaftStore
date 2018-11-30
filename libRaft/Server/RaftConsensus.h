@@ -686,7 +686,7 @@ class Configuration {
 
   private:
     /**
-     * A majority of these servers are necessary for a quorum under 
+     * A majority of these servers are necessary for a quorum under
      * STABLE, STAGING, and TRANSITIONAL configurations. (Under TRANSITIONAL, a
      * majority of newServers is also needed.)
      */
@@ -1216,12 +1216,6 @@ class RaftConsensus {
     void peerThreadMain(std::shared_ptr<Peer> peer);
 
     /**
-     * Append advance state machine version entries to the log as leader once
-     * all servers can support a new state machine version.
-     */
-    void stateMachineUpdaterThreadMain();
-
-    /**
      * Return to follower state when, as leader, this server is not able to
      * communicate with a quorum. This helps two things in cases where a quorum
      * is not available to this leader but clients can still communicate with
@@ -1436,16 +1430,6 @@ class RaftConsensus {
      * another one, so as to not overwhelm the network with retries.
      */
     const std::chrono::nanoseconds RPC_FAILURE_BACKOFF;
-
-    /**
-     * How long the state machine updater thread should sleep if:
-     * - The servers do not currently support a common version, or
-     * - This server has not yet received version information from all other
-     *   servers, or
-     * - An advance state machine entry failed to commit (probably due to lost
-     *   leadership).
-     */
-    const std::chrono::nanoseconds STATE_MACHINE_UPDATER_BACKOFF;
 
     /**
      * Prefer to keep RPC requests under this size.
@@ -1699,12 +1683,6 @@ class RaftConsensus {
      * after periods of inactivity.
      */
     std::thread timerThread;
-
-    /**
-     * The thread that executes stateMachineUpdaterThreadMain() to append
-     * advance state machine version entries to the log on leaders.
-     */
-    std::thread stateMachineUpdaterThread;
 
     /**
      * The thread that executes stepDownThreadMain() to return to the follower

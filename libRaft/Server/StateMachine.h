@@ -37,32 +37,10 @@ namespace Server {
 class Globals;
 class RaftConsensus;
 
-/**
- * Interprets and executes operations that have been committed into the Raft
- * log.
- *
- * Version history:
- * - Version 1 of the State Machine shipped with LogCabin v1.0.0.
- * - Version 2 added the CloseSession command, which clients can use when they
- *   gracefully shut down.
- */
 class StateMachine {
   public:
     typedef Protocol::Client::StateMachineCommand Command;
     typedef Protocol::Client::StateMachineQuery Query;
-
-    enum {
-        /**
-         * This state machine code can behave like all versions between
-         * MIN_SUPPORTED_VERSION and MAX_SUPPORTED_VERSION, inclusive.
-         */
-        MIN_SUPPORTED_VERSION = 1,
-        /**
-         * This state machine code can behave like all versions between
-         * MIN_SUPPORTED_VERSION and MAX_SUPPORTED_VERSION, inclusive.
-         */
-        MAX_SUPPORTED_VERSION = 2,
-    };
 
 
     StateMachine(std::shared_ptr<RaftConsensus> consensus,
@@ -187,13 +165,6 @@ class StateMachine {
     void expireSessions(uint64_t clusterTime);
 
     /**
-     * Return the version of the state machine behavior as of the given log
-     * index. Note that this is based on versionHistory internally, so if
-     * you're changing that variable at the given index, update it first.
-     */
-    uint16_t getVersion(uint64_t logIndex) const;
-
-    /**
      * If there is a current snapshot process, send it a signal and return
      * immediately.
      */
@@ -209,17 +180,6 @@ class StateMachine {
      * (including version, sessions, and tree).
      */
     void loadSnapshot(Core::ProtoBuf::InputStream& stream);
-
-    /**
-     * Restore the #versionHistory table from a snapshot.
-     */
-    void loadVersionHistory(const SnapshotStateMachine::Header& header);
-
-    /**
-     * Return the #versionHistory table as a protobuf message for writing into
-     * a snapshot.
-     */
-    void serializeVersionHistory(SnapshotStateMachine::Header& header) const;
 
     /**
      * Return true if it is time to create a new snapshot.
@@ -402,34 +362,6 @@ class StateMachine {
     uint64_t numSnapshotsFailed;
 
     /**
-     * The number of times a log entry was processed to advance the state
-     * machine's running version, but the state machine was already at that
-     * version.
-     */
-    uint64_t numRedundantAdvanceVersionEntries;
-
-    /**
-     * The number of times a log entry was processed to advance the state
-     * machine's running version, but the state machine was already at a larger
-     * version.
-     */
-    uint64_t numRejectedAdvanceVersionEntries;
-
-    /**
-     * The number of times a log entry was processed to successfully advance
-     * the state machine's running version, where the state machine was
-     * previously at a smaller version.
-     */
-    uint64_t numSuccessfulAdvanceVersionEntries;
-
-    /**
-     * The number of times any log entry to advance the state machine's running
-     * version was processed. Should be the sum of redundant, rejected, and
-     * successful counts.
-     */
-    uint64_t numTotalAdvanceVersionEntries;
-
-    /**
      * Set to true when an administrator has asked the server to take a
      * snapshot; set to false once the server starts any snapshot.
      * Snapshots that are requested due to this flag are permitted to begin
@@ -485,20 +417,6 @@ class StateMachine {
      * readWriteStoreRPC.
      */
     Store::Store store;
-
-    /**
-     * The log position when the state machine was updated to each new version.
-     * First component: log index. Second component: version number.
-     * Used to evolve state machine over time.
-     *
-     * This is used by getResponse() to determine the running version at a
-     * given log index (to determine whether a command would have been
-     * applied), and it's used elsewhere to determine the state machine's
-     * current running version.
-     *
-     * Invariant: the pair (index 0, version 1) is always present.
-     */
-    std::map<uint64_t, uint16_t> versionHistory;
 
     /**
      * The file that the snapshot is being written into. Also used by to track
